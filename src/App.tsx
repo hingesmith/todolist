@@ -3,11 +3,13 @@ import ListPage from './pages/List'
 import CreatePage from './pages/Create'
 import EditPage from './pages/Edit'
 import BoardPage from './pages/Board'
-import { LayoutList, Kanban } from 'lucide-react'
+import GanttPage from './pages/Gantt'
+import { LayoutList, Kanban, GanttChartSquare } from 'lucide-react'
 
 export type PageState =
   | { type: 'list' }
   | { type: 'board' }
+  | { type: 'gantt' }
   | { type: 'create' }
   | { type: 'edit'; id: string }
 
@@ -52,6 +54,17 @@ function App() {
             <Kanban size={20} />
             <span>Board View</span>
           </button>
+          <button
+            onClick={() => navigateTo({ type: 'gantt' })}
+            className={`flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-medium transition-all ${
+              page.type === 'gantt'
+                ? 'bg-blue-50 text-blue-700 dark:bg-blue-900/50 dark:text-blue-200'
+                : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900 dark:text-gray-300 dark:hover:bg-gray-700 dark:hover:text-white'
+            }`}
+          >
+            <GanttChartSquare size={20} />
+            <span>Gantt View</span>
+          </button>
         </div>
       </nav>
 
@@ -59,6 +72,7 @@ function App() {
         <div className="mx-auto w-full min-w-0">
           {page.type === 'list' && <ListPage onNavigate={navigateTo} />}
           {page.type === 'board' && <BoardPage onNavigate={navigateTo} />}
+          {page.type === 'gantt' && <GanttPage onNavigate={navigateTo} />}
           {page.type === 'create' && <CreatePage onNavigate={navigateTo} />}
           {page.type === 'edit' && <EditPage id={page.id} onNavigate={navigateTo} />}
         </div>
