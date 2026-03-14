@@ -141,10 +141,10 @@ export default function BoardPage({ onNavigate }: BoardPageProps) {
                       <div className="flex flex-wrap items-center justify-between gap-y-2 pt-2 mt-auto">
                         <Badge priority={todo.priority}>{prioritizeText[todo.priority || 'medium']}</Badge>
                         
-                        {todo.due_date && (
+                        {todo.end_date && (
                           <div className="flex items-center gap-1 text-xs text-gray-500 dark:text-gray-400">
                             <Clock size={12} />
-                            <span>{new Date(todo.due_date).toLocaleDateString()}</span>
+                            <span>{new Date(todo.end_date).toLocaleDateString()}</span>
                           </div>
                         )}
                       </div>

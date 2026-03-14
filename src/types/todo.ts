@@ -9,6 +9,7 @@ export interface Todo {
   priority?: TodoPriority
   created_at: string
   updated_at?: string
-  due_date?: string
+  end_date?: string
+  start_date?: string
   tags?: string[]
 }

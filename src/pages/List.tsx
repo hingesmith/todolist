@@ -31,9 +31,9 @@ export default function ListPage({ onNavigate }: ListPageProps) {
     switch (sortBy) {
       case 'due_asc':
         return list.sort((a, b) => {
-          if (!a.due_date) return 1
-          if (!b.due_date) return -1
-          return new Date(a.due_date).getTime() - new Date(b.due_date).getTime()
+          if (!a.end_date) return 1
+          if (!b.end_date) return -1
+          return new Date(a.end_date).getTime() - new Date(b.end_date).getTime()
         })
       case 'priority_desc':
         const pScore = { 'high': 3, 'medium': 2, 'low': 1 }
@@ -81,7 +81,7 @@ export default function ListPage({ onNavigate }: ListPageProps) {
               onChange={(e) => setSortBy(e.target.value as any)}
             >
               <option value="created_desc">Newest First</option>
-              <option value="due_asc">Due Date</option>
+              <option value="due_asc">End Date</option>
               <option value="priority_desc">Priority</option>
             </select>
           </div>
@@ -156,10 +156,10 @@ export default function ListPage({ onNavigate }: ListPageProps) {
                 )}
 
                 <div className="flex flex-wrap items-center gap-4 text-xs text-gray-500 dark:text-gray-400 pt-2">
-                  {todo.due_date && (
+                  {todo.end_date && (
                     <div className="flex items-center gap-1.5">
                       <Clock size={14} />
-                      <span>Due: {new Date(todo.due_date).toLocaleDateString()}</span>
+                      <span>End: {new Date(todo.end_date).toLocaleDateString()}</span>
                     </div>
                   )}
 

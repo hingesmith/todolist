@@ -62,10 +62,16 @@ export default function CreatePage({ onNavigate }: CreatePageProps) {
       updated_at: now,
     }
 
-    if (formData.due_date) {
-      todo.due_date = new Date(formData.due_date).toISOString()
+    if (formData.end_date) {
+      todo.end_date = new Date(formData.end_date).toISOString()
     } else {
-      delete todo.due_date
+      delete todo.end_date
+    }
+
+    if (formData.start_date) {
+      todo.start_date = new Date(formData.start_date).toISOString()
+    } else {
+      delete todo.start_date
     }
 
     if (!todo.description) {
@@ -164,17 +170,29 @@ export default function CreatePage({ onNavigate }: CreatePageProps) {
           </div>
         </div>
 
-        <div className="space-y-2">
-          <Label htmlFor="due_date">Due Date</Label>
-          <Input
-            id="due_date"
-            name="due_date"
-            type="datetime-local"
-            value={formData.due_date || ''}
-            onChange={handleChange}
-            error={!!errors.due_date}
-          />
-          {errors.due_date && <p className="text-sm text-red-500">{errors.due_date}</p>}
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+          <div className="space-y-2">
+            <Label htmlFor="start_date">Start Date</Label>
+            <Input
+              id="start_date"
+              name="start_date"
+              type="datetime-local"
+              value={formData.start_date || ''}
+              onChange={handleChange}
+            />
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="end_date">End Date</Label>
+            <Input
+              id="end_date"
+              name="end_date"
+              type="datetime-local"
+              value={formData.end_date || ''}
+              onChange={handleChange}
+              error={!!errors.end_date}
+            />
+            {errors.end_date && <p className="text-sm text-red-500">{errors.end_date}</p>}
+          </div>
         </div>
 
         <div className="space-y-2">
