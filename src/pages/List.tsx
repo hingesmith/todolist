@@ -71,9 +71,6 @@ export default function ListPage({ onNavigate }: ListPageProps) {
             <option value="due_asc">Due Date</option>
             <option value="priority_desc">Priority</option>
           </select>
-          <Button onClick={() => onNavigate({ type: 'create' })} className="gap-2">
-            <Plus size={16} /> New Task
-          </Button>
         </div>
       </div>
 
@@ -138,6 +135,13 @@ export default function ListPage({ onNavigate }: ListPageProps) {
               </div>
             </div>
           ))}
+          <Button 
+            onClick={() => onNavigate({ type: 'create' })} 
+            className="w-full mt-4 flex items-center justify-center gap-2 py-6 border-2 border-dashed border-gray-300 dark:border-gray-600 bg-transparent text-gray-600 hover:text-gray-900 hover:bg-gray-50 dark:text-gray-400 dark:hover:text-gray-100 dark:hover:bg-gray-800/50"
+            variant="outline"
+          >
+            <Plus size={20} /> Add New Task
+          </Button>
         </div>
       )}
     </div>

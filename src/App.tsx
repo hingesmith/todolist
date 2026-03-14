@@ -2,9 +2,12 @@ import { useState } from 'react'
 import ListPage from './pages/List'
 import CreatePage from './pages/Create'
 import EditPage from './pages/Edit'
+import BoardPage from './pages/Board'
+import { LayoutList, Kanban } from 'lucide-react'
 
 export type PageState =
   | { type: 'list' }
+  | { type: 'board' }
   | { type: 'create' }
   | { type: 'edit'; id: string }
 
@@ -16,9 +19,9 @@ function App() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-gray-900 transition-colors duration-200">
-      <header className="bg-white dark:bg-gray-800 shadow-sm sticky top-0 z-10">
-        <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
+    <div className="flex min-h-screen bg-gray-50 dark:bg-gray-900 transition-colors duration-200">
+      <nav className="w-64 bg-white dark:bg-gray-800 shadow-md flex-shrink-0 flex flex-col h-screen sticky top-0">
+        <div className="p-6">
           <h1
             className="text-2xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-blue-600 to-indigo-600 cursor-pointer"
             onClick={() => navigateTo({ type: 'list' })}
@@ -26,12 +29,39 @@ function App() {
             ToDo List
           </h1>
         </div>
-      </header>
+        <div className="flex-1 px-4 flex flex-col gap-2">
+          <button
+            onClick={() => navigateTo({ type: 'list' })}
+            className={`flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-medium transition-all ${
+              page.type === 'list'
+                ? 'bg-blue-50 text-blue-700 dark:bg-blue-900/50 dark:text-blue-200'
+                : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900 dark:text-gray-300 dark:hover:bg-gray-700 dark:hover:text-white'
+            }`}
+          >
+            <LayoutList size={20} />
+            <span>List View</span>
+          </button>
+          <button
+            onClick={() => navigateTo({ type: 'board' })}
+            className={`flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-medium transition-all ${
+              page.type === 'board'
+                ? 'bg-blue-50 text-blue-700 dark:bg-blue-900/50 dark:text-blue-200'
+                : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900 dark:text-gray-300 dark:hover:bg-gray-700 dark:hover:text-white'
+            }`}
+          >
+            <Kanban size={20} />
+            <span>Board View</span>
+          </button>
+        </div>
+      </nav>
 
-      <main className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {page.type === 'list' && <ListPage onNavigate={navigateTo} />}
-        {page.type === 'create' && <CreatePage onNavigate={navigateTo} />}
-        {page.type === 'edit' && <EditPage id={page.id} onNavigate={navigateTo} />}
+      <main className="flex-1 overflow-x-hidden p-8 transition-all duration-300">
+        <div className="mx-auto w-full min-w-0">
+          {page.type === 'list' && <ListPage onNavigate={navigateTo} />}
+          {page.type === 'board' && <BoardPage onNavigate={navigateTo} />}
+          {page.type === 'create' && <CreatePage onNavigate={navigateTo} />}
+          {page.type === 'edit' && <EditPage id={page.id} onNavigate={navigateTo} />}
+        </div>
       </main>
     </div>
   )
