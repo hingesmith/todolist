@@ -4,12 +4,14 @@ import CreatePage from './pages/Create'
 import EditPage from './pages/Edit'
 import BoardPage from './pages/Board'
 import GanttPage from './pages/Gantt'
-import { LayoutList, Kanban, GanttChartSquare } from 'lucide-react'
+import AiAssistantPage from './pages/AiAssistant'
+import { LayoutList, Kanban, GanttChartSquare, Sparkles } from 'lucide-react'
 
 export type PageState =
   | { type: 'list' }
   | { type: 'board' }
   | { type: 'gantt' }
+  | { type: 'ai' }
   | { type: 'create' }
   | { type: 'edit'; id: string }
 
@@ -65,6 +67,17 @@ function App() {
             <GanttChartSquare size={20} />
             <span>Gantt View</span>
           </button>
+          <button
+            onClick={() => navigateTo({ type: 'ai' })}
+            className={`flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-medium transition-all ${
+              page.type === 'ai'
+                ? 'bg-indigo-50 text-indigo-700 dark:bg-indigo-900/50 dark:text-indigo-200'
+                : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900 dark:text-gray-300 dark:hover:bg-gray-700 dark:hover:text-white'
+            }`}
+          >
+            <Sparkles size={20} className={page.type === 'ai' ? 'text-indigo-600 dark:text-indigo-400' : ''} />
+            <span>AI Assistant</span>
+          </button>
         </div>
       </nav>
 
@@ -73,6 +86,7 @@ function App() {
           {page.type === 'list' && <ListPage onNavigate={navigateTo} />}
           {page.type === 'board' && <BoardPage onNavigate={navigateTo} />}
           {page.type === 'gantt' && <GanttPage onNavigate={navigateTo} />}
+          {page.type === 'ai' && <AiAssistantPage onNavigate={navigateTo} />}
           {page.type === 'create' && <CreatePage onNavigate={navigateTo} />}
           {page.type === 'edit' && <EditPage id={page.id} onNavigate={navigateTo} />}
         </div>

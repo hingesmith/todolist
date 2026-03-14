@@ -51,9 +51,31 @@ export const storage = {
   },
 
   deleteTodo: (id: string): boolean => {
-    const currentTodos = storage.getTodos()
-    const newTodos = currentTodos.filter(t => t.id !== id)
-    return storage.saveTodos(newTodos)
+    const todos = storage.getTodos()
+    const filtered = todos.filter(t => t.id !== id)
+    if (filtered.length === todos.length) return false
+    return storage.saveTodos(filtered)
+  },
+
+  addTodos: (newTodos: Todo[]): boolean => {
+    const todos = storage.getTodos()
+    return storage.saveTodos([...todos, ...newTodos])
+  },
+
+  getApiKey: (): string | null => {
+    try {
+      return localStorage.getItem('gemini_api_key')
+    } catch {
+      return null
+    }
+  },
+
+  setApiKey: (key: string): void => {
+    try {
+      localStorage.setItem('gemini_api_key', key)
+    } catch (e) {
+      console.error('Failed to save API key', e)
+    }
   },
   
   getTodo: (id: string): Todo | undefined => {
