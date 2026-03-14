@@ -9,6 +9,7 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "@google/genai": "^1.45.0",
     "ajv": "^8.12.0",
     "ajv-formats": "^3.0.1",
     "lucide-react": "^0.368.0",
