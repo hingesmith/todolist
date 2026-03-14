@@ -99,3 +99,24 @@
     @apply bg-background text-foreground;
   }
 }
+
+/* Format native date/time inputs */
+input[type="date"],
+input[type="datetime-local"] {
+  position: relative;
+  /* Ensure text doesn't overlap icon */
+  padding-right: 2.5rem;
+}
+
+input[type="date"]::-webkit-calendar-picker-indicator,
+input[type="datetime-local"]::-webkit-calendar-picker-indicator {
+  position: absolute;
+  right: 0.75rem; /* Match the px-3 (12px) padding of the Input component */
+  top: 50%;
+  transform: translateY(-50%);
+  width: 1.25rem;
+  height: 1.25rem;
+  margin: 0;
+  padding: 0;
+  cursor: pointer;
+}

@@ -25,22 +25,16 @@ export default function EditPage({ id, onNavigate }: EditPageProps) {
       // Format datetime for datetime-local input
       if (todo.end_date) {
         try {
-          const date = new Date(todo.end_date)
-          const offset = date.getTimezoneOffset() * 60000
-          const localISOTime = (new Date(date.getTime() - offset)).toISOString().slice(0, 16)
-          todo.end_date = localISOTime
+          todo.end_date = todo.end_date.slice(0, 10)
         } catch (e) {
-          console.error("Failed to parse due date", e)
+          console.error('Failed to parse end date', e)
         }
       }
       if (todo.start_date) {
         try {
-          const date = new Date(todo.start_date)
-          const offset = date.getTimezoneOffset() * 60000
-          const localISOTime = (new Date(date.getTime() - offset)).toISOString().slice(0, 16)
-          todo.start_date = localISOTime
+          todo.start_date = todo.start_date.slice(0, 10)
         } catch (e) {
-          console.error("Failed to parse start date", e)
+          console.error('Failed to parse start date', e)
         }
       }
       setFormData(todo)
@@ -98,13 +92,13 @@ export default function EditPage({ id, onNavigate }: EditPageProps) {
     }
 
     if (formData.end_date) {
-      todo.end_date = new Date(formData.end_date).toISOString()
+      todo.end_date = formData.end_date
     } else {
       delete todo.end_date
     }
 
     if (formData.start_date) {
-      todo.start_date = new Date(formData.start_date).toISOString()
+      todo.start_date = formData.start_date
     } else {
       delete todo.start_date
     }
@@ -211,7 +205,7 @@ export default function EditPage({ id, onNavigate }: EditPageProps) {
             <Input
               id="start_date"
               name="start_date"
-              type="datetime-local"
+              type="date"
               value={formData.start_date || ''}
               onChange={handleChange}
             />
@@ -221,7 +215,7 @@ export default function EditPage({ id, onNavigate }: EditPageProps) {
             <Input
               id="end_date"
               name="end_date"
-              type="datetime-local"
+              type="date"
               value={formData.end_date || ''}
               onChange={handleChange}
               error={!!errors.end_date}

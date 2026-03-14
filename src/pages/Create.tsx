@@ -63,13 +63,13 @@ export default function CreatePage({ onNavigate }: CreatePageProps) {
     }
 
     if (formData.end_date) {
-      todo.end_date = new Date(formData.end_date).toISOString()
+      todo.end_date = formData.end_date
     } else {
       delete todo.end_date
     }
 
     if (formData.start_date) {
-      todo.start_date = new Date(formData.start_date).toISOString()
+      todo.start_date = formData.start_date
     } else {
       delete todo.start_date
     }
@@ -176,7 +176,7 @@ export default function CreatePage({ onNavigate }: CreatePageProps) {
             <Input
               id="start_date"
               name="start_date"
-              type="datetime-local"
+              type="date"
               value={formData.start_date || ''}
               onChange={handleChange}
             />
@@ -186,7 +186,7 @@ export default function CreatePage({ onNavigate }: CreatePageProps) {
             <Input
               id="end_date"
               name="end_date"
-              type="datetime-local"
+              type="date"
               value={formData.end_date || ''}
               onChange={handleChange}
               error={!!errors.end_date}
