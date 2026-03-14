@@ -58,13 +58,13 @@
       },
       "end_date": {
         "type": "string",
-        "format": "date-time",
-        "description": "タスクの終了日時（ISO 8601形式）"
+        "format": "date",
+        "description": "タスクの終了日（YYYY-MM-DD形式）"
       },
       "start_date": {
         "type": "string",
-        "format": "date-time",
-        "description": "タスクの開始日時（ISO 8601形式）"
+        "format": "date",
+        "description": "タスクの開始日（YYYY-MM-DD形式）"
       },
       "tags": {
         "type": "array",
