@@ -1,0 +1,75 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "TodoList",
+  "description": "ToDoアイテムのリストを管理するためのスキーマ",
+  "type": "array",
+  "items": {
+    "type": "object",
+    "required": [
+      "id",
+      "title",
+      "status",
+      "created_at"
+    ],
+    "properties": {
+      "id": {
+        "type": "string",
+        "format": "uuid",
+        "description": "ToDoアイテムの一意の識別子（UUIDなどを想定）"
+      },
+      "title": {
+        "type": "string",
+        "minLength": 1,
+        "description": "ToDoのタイトルまたはタスク名"
+      },
+      "description": {
+        "type": "string",
+        "description": "ToDoの詳細な説明"
+      },
+      "status": {
+        "type": "string",
+        "enum": [
+          "todo",
+          "in_progress",
+          "done"
+        ],
+        "default": "todo",
+        "description": "タスクの現在の進捗ステータス"
+      },
+      "priority": {
+        "type": "string",
+        "enum": [
+          "low",
+          "medium",
+          "high"
+        ],
+        "default": "medium",
+        "description": "タスクの優先度"
+      },
+      "created_at": {
+        "type": "string",
+        "format": "date-time",
+        "description": "タスクの作成日時（ISO 8601形式）"
+      },
+      "updated_at": {
+        "type": "string",
+        "format": "date-time",
+        "description": "タスクの最終更新日時（ISO 8601形式）"
+      },
+      "due_date": {
+        "type": "string",
+        "format": "date-time",
+        "description": "タスクの期限・期日（ISO 8601形式）"
+      },
+      "tags": {
+        "type": "array",
+        "items": {
+          "type": "string"
+        },
+        "uniqueItems": true,
+        "description": "タスクに関連付けられたタグのリスト"
+      }
+    },
+    "additionalProperties": false
+  }
+}
