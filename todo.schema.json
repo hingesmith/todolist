@@ -56,10 +56,15 @@
         "format": "date-time",
         "description": "タスクの最終更新日時（ISO 8601形式）"
       },
-      "due_date": {
+      "end_date": {
         "type": "string",
         "format": "date-time",
-        "description": "タスクの期限・期日（ISO 8601形式）"
+        "description": "タスクの終了日時（ISO 8601形式）"
+      },
+      "start_date": {
+        "type": "string",
+        "format": "date-time",
+        "description": "タスクの開始日時（ISO 8601形式）"
       },
       "tags": {
         "type": "array",
