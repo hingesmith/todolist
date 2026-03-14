@@ -12,6 +12,8 @@ interface BoardPageProps {
 export default function BoardPage({ onNavigate }: BoardPageProps) {
   const [todos, setTodos] = React.useState<Todo[]>([])
   const [selectedTag, setSelectedTag] = React.useState<string | null>(null)
+  const [draggingId, setDraggingId] = React.useState<string | null>(null)
+  const [dragOverColumn, setDragOverColumn] = React.useState<TodoStatus | null>(null)
 
   React.useEffect(() => {
     setTodos(storage.getTodos())
@@ -59,6 +61,51 @@ export default function BoardPage({ onNavigate }: BoardPageProps) {
     setSelectedTag(prev => prev === tag ? null : tag)
   }
 
+  // Drag and Drop Handlers
+  const handleDragStart = (e: React.DragEvent, id: string) => {
+    e.dataTransfer.setData('todoId', id)
+    e.dataTransfer.effectAllowed = 'move'
+    // Delay setting state so the drag ghost image doesn't show the transparent state
+    setTimeout(() => setDraggingId(id), 0)
+  }
+
+  const handleDragEnd = () => {
+    setDraggingId(null)
+    setDragOverColumn(null)
+  }
+
+  const handleDragOver = (e: React.DragEvent, status: TodoStatus) => {
+    e.preventDefault()
+    e.dataTransfer.dropEffect = 'move'
+    if (dragOverColumn !== status) {
+      setDragOverColumn(status)
+    }
+  }
+
+  const handleDragLeave = (e: React.DragEvent) => {
+    e.preventDefault()
+    // We only clear if we are leaving the actual column container, not its children
+    if ((e.currentTarget as HTMLElement) === e.target) {
+      setDragOverColumn(null)
+    }
+  }
+
+  const handleDrop = (e: React.DragEvent, status: TodoStatus) => {
+    e.preventDefault()
+    setDragOverColumn(null)
+    setDraggingId(null)
+    const id = e.dataTransfer.getData('todoId')
+    if (!id) return
+
+    const todoToMove = todos.find(t => t.id === id)
+    // If the task exists and we are actually changing the status
+    if (todoToMove && todoToMove.status !== status) {
+      todoToMove.status = status
+      storage.updateTodo(todoToMove)
+      setTodos(storage.getTodos())
+    }
+  }
+
   return (
     <div className="space-y-6">
       <div className="flex flex-col gap-3">
@@ -96,9 +143,20 @@ export default function BoardPage({ onNavigate }: BoardPageProps) {
       <div className="flex flex-col md:flex-row gap-6 items-start overflow-x-auto pb-4">
         {columns.map(column => {
           const columnTodos = getTodosByStatus(column.id)
+          const isDragOver = dragOverColumn === column.id
           
           return (
-            <div key={column.id} className="flex-1 min-w-[300px] w-full bg-gray-100/50 dark:bg-gray-800/50 rounded-xl p-4 flex flex-col gap-4">
+            <div
+              key={column.id}
+              className={`flex-1 min-w-[300px] w-full rounded-xl p-4 flex flex-col gap-4 transition-colors ${
+                isDragOver
+                  ? 'bg-indigo-50/80 dark:bg-indigo-900/20 border-2 border-indigo-400 border-dashed'
+                  : 'bg-gray-100/50 dark:bg-gray-800/50 border-2 border-transparent'
+              }`}
+              onDragOver={(e) => handleDragOver(e, column.id)}
+              onDragLeave={handleDragLeave}
+              onDrop={(e) => handleDrop(e, column.id)}
+            >
               <div className="flex items-center justify-between">
                 <h3 className="font-semibold text-gray-700 dark:text-gray-300 flex items-center gap-2">
                   {column.label}
@@ -114,13 +172,21 @@ export default function BoardPage({ onNavigate }: BoardPageProps) {
                     {selectedTag ? `No "${selectedTag}" tasks` : 'No tasks'}
                   </div>
                 ) : (
-                  columnTodos.map(todo => (
-                    <div
-                      key={todo.id}
-                      onClick={() => onNavigate({ type: 'edit', id: todo.id })}
-                      className="bg-white dark:bg-gray-800 p-4 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 hover:border-indigo-500 transition-colors cursor-pointer group flex flex-col gap-2"
-                    >
-                      <div className="flex items-start justify-between gap-2">
+                  columnTodos.map(todo => {
+                    const isDragging = draggingId === todo.id
+                    
+                    return (
+                      <div
+                        key={todo.id}
+                        draggable
+                        onDragStart={(e) => handleDragStart(e, todo.id)}
+                        onDragEnd={handleDragEnd}
+                        onClick={() => onNavigate({ type: 'edit', id: todo.id })}
+                        className={`bg-white dark:bg-gray-800 p-4 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 transition-all cursor-grab active:cursor-grabbing group flex flex-col gap-2 ${
+                          isDragging ? 'opacity-40 scale-95 shadow-none' : 'hover:border-indigo-500'
+                        }`}
+                      >
+                        <div className="flex items-start justify-between gap-2">
                         <h4 className={`font-medium text-sm leading-tight ${todo.status === 'done' ? 'line-through text-gray-500' : 'text-gray-900 dark:text-gray-100'}`}>
                           {todo.title}
                         </h4>
@@ -167,8 +233,8 @@ export default function BoardPage({ onNavigate }: BoardPageProps) {
                         </div>
                       )}
                     </div>
-                  ))
-                )}
+                  )
+                }))}
                 
                 <button
                   onClick={() => onNavigate({ type: 'create' })}
