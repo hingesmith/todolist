@@ -8,12 +8,13 @@ import { Plus, Clock, Tag, X } from 'lucide-react'
 
 interface ListPageProps {
   onNavigate: (page: PageState) => void
+  selectedTag: string | null
+  onTagSelect: (tag: string | null) => void
 }
 
-export default function ListPage({ onNavigate }: ListPageProps) {
+export default function ListPage({ onNavigate, selectedTag, onTagSelect }: ListPageProps) {
   const [todos, setTodos] = React.useState<Todo[]>([])
   const [sortBy, setSortBy] = React.useState<'created_desc' | 'due_asc' | 'priority_desc'>('created_desc')
-  const [selectedTag, setSelectedTag] = React.useState<string | null>(null)
 
   React.useEffect(() => {
     setTodos(storage.getTodos())
@@ -44,17 +45,8 @@ export default function ListPage({ onNavigate }: ListPageProps) {
     }
   }, [todos, sortBy, selectedTag])
 
-  const prioritizeText = {
-    'low': 'Low',
-    'medium': 'Medium',
-    'high': 'High'
-  }
-
-  const statusText = {
-    'todo': 'To Do',
-    'in_progress': 'In Progress',
-    'done': 'Done'
-  }
+  const prioritizeText = { 'low': 'Low', 'medium': 'Medium', 'high': 'High' }
+  const statusText = { 'todo': 'To Do', 'in_progress': 'In Progress', 'done': 'Done' }
 
   const handleDelete = (id: string, e: React.MouseEvent) => {
     e.stopPropagation()
@@ -66,14 +58,25 @@ export default function ListPage({ onNavigate }: ListPageProps) {
 
   const handleTagClick = (e: React.MouseEvent, tag: string) => {
     e.stopPropagation()
-    setSelectedTag(prev => prev === tag ? null : tag)
+    onTagSelect(tag)
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4">
       <div className="flex flex-col gap-3">
         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-          <h2 className="text-3xl font-bold tracking-tight text-gray-900 dark:text-gray-100">Tasks</h2>
+          <div className="flex items-center gap-3">
+            <h2 className="text-3xl font-bold tracking-tight text-gray-900 dark:text-gray-100">Tasks</h2>
+            {selectedTag && (
+              <span className="flex items-center gap-1.5 bg-indigo-100 text-indigo-700 dark:bg-indigo-900/40 dark:text-indigo-300 text-sm font-medium px-3 py-1 rounded-full">
+                <Tag size={13} />
+                {selectedTag}
+                <button onClick={() => onTagSelect(null)} className="ml-0.5 hover:text-indigo-900 dark:hover:text-indigo-100">
+                  <X size={13} />
+                </button>
+              </span>
+            )}
+          </div>
           <div className="flex items-center gap-4 w-full sm:w-auto text-gray-900 dark:text-gray-100">
             <select
               className="h-10 rounded-md border border-gray-300 bg-white py-2 px-3 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 dark:bg-gray-800 dark:border-gray-700 dark:focus:ring-indigo-400"
@@ -87,14 +90,17 @@ export default function ListPage({ onNavigate }: ListPageProps) {
           </div>
         </div>
 
+        {/* Tag filter strip — mobile: always shown when tags exist; desktop: supplemental (sidebar is primary) */}
         {allTags.length > 0 && (
-          <div className="flex items-center gap-2 flex-wrap">
-            <span className="text-xs text-gray-500 dark:text-gray-400 font-medium">Filter by tag:</span>
+          <div className="flex items-center gap-2 overflow-x-auto pb-1 -mx-1 px-1 sm:flex-wrap sm:overflow-visible">
+            <span className="text-xs text-gray-500 dark:text-gray-400 font-medium shrink-0">
+              {selectedTag ? 'Tag:' : 'Filter:'}
+            </span>
             {allTags.map(tag => (
               <button
                 key={tag}
-                onClick={() => setSelectedTag(prev => prev === tag ? null : tag)}
-                className={`flex items-center gap-1 text-xs px-2.5 py-1 rounded-full border font-medium transition-all ${
+                onClick={() => onTagSelect(tag)}
+                className={`flex items-center gap-1 text-xs px-2.5 py-1 rounded-full border font-medium transition-all shrink-0 ${
                   selectedTag === tag
                     ? 'bg-indigo-600 text-white border-indigo-600'
                     : 'bg-white dark:bg-gray-800 text-gray-600 dark:text-gray-300 border-gray-300 dark:border-gray-600 hover:border-indigo-400 hover:text-indigo-600 dark:hover:text-indigo-400'
@@ -106,10 +112,10 @@ export default function ListPage({ onNavigate }: ListPageProps) {
             ))}
             {selectedTag && (
               <button
-                onClick={() => setSelectedTag(null)}
-                className="text-xs text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 underline"
+                onClick={() => onTagSelect(null)}
+                className="text-xs text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 underline shrink-0"
               >
-                Clear filter
+                Clear
               </button>
             )}
           </div>
@@ -119,10 +125,14 @@ export default function ListPage({ onNavigate }: ListPageProps) {
       {sortedTodos.length === 0 ? (
         <div className="text-center py-12 bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 border-dashed">
           <h3 className="text-lg font-medium text-gray-900 dark:text-gray-100">No tasks found</h3>
-          <p className="mt-1 flex text-sm text-gray-500 dark:text-gray-400 justify-center text-center">Get started by creating a new task.</p>
-          <Button onClick={() => onNavigate({ type: 'create' })} className="mt-4 gap-2">
-            <Plus size={16} /> Create Task
-          </Button>
+          <p className="mt-1 flex text-sm text-gray-500 dark:text-gray-400 justify-center text-center">
+            {selectedTag ? `No tasks tagged "${selectedTag}".` : 'Get started by creating a new task.'}
+          </p>
+          {!selectedTag && (
+            <Button onClick={() => onNavigate({ type: 'create' })} className="mt-4 gap-2">
+              <Plus size={16} /> Create Task
+            </Button>
+          )}
         </div>
       ) : (
         <div className="grid gap-4">
@@ -185,8 +195,8 @@ export default function ListPage({ onNavigate }: ListPageProps) {
               </div>
             </div>
           ))}
-          <Button 
-            onClick={() => onNavigate({ type: 'create' })} 
+          <Button
+            onClick={() => onNavigate({ type: 'create' })}
             className="w-full mt-4 flex items-center justify-center gap-2 py-6 border-2 border-dashed border-gray-300 dark:border-gray-600 bg-transparent text-gray-600 hover:text-gray-900 hover:bg-gray-50 dark:text-gray-400 dark:hover:text-gray-100 dark:hover:bg-gray-800/50"
             variant="outline"
           >
