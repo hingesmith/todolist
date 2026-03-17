@@ -37,7 +37,8 @@ const SYSTEM_INSTRUCTION = `
         "priority": "low" | "medium" | "high",
         "start_date": "YYYY-MM-DD",
         "end_date": "YYYY-MM-DD",
-        "tags": ["タグ1", "タグ2"]
+        "tags": ["タグ1", "タグ2"],
+        "dependencies": ["前提となるタスクのID", "別のタスクのID"]
       }
     },
     {
@@ -45,7 +46,8 @@ const SYSTEM_INSTRUCTION = `
       "id": "既存タスクのID",
       "reasoning": "ユーザーの指示により期限を延長しました",
       "todo": {
-        "status": "done"
+        "status": "done",
+        "dependencies": ["依存関係を追加・更新する場合はIDの配列"]
       }
     },
     {
