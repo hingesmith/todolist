@@ -17,10 +17,17 @@ export default function CreatePage({ onNavigate }: CreatePageProps) {
   const [formData, setFormData] = useState<Partial<Todo>>({
     status: 'todo',
     priority: 'medium',
-    tags: []
+    tags: [],
+    dependencies: []
   })
   const [tagInput, setTagInput] = useState('')
+  const [depInput, setDepInput] = useState('')
   const [errors, setErrors] = useState<Record<string, string>>({})
+  const [availableTodos, setAvailableTodos] = useState<Todo[]>([])
+
+  React.useEffect(() => {
+    setAvailableTodos(storage.getTodos())
+  }, [])
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target
@@ -45,6 +52,24 @@ export default function CreatePage({ onNavigate }: CreatePageProps) {
     setFormData((prev: Partial<Todo>) => ({
       ...prev,
       tags: prev.tags?.filter((tag: string) => tag !== tagToRemove)
+    }))
+  }
+
+  const handleAddDependency = () => {
+    if (!depInput) return
+    if (!formData.dependencies?.includes(depInput)) {
+      setFormData((prev: Partial<Todo>) => ({
+        ...prev,
+        dependencies: [...(prev.dependencies || []), depInput]
+      }))
+    }
+    setDepInput('')
+  }
+
+  const handleRemoveDependency = (idToRemove: string) => {
+    setFormData((prev: Partial<Todo>) => ({
+      ...prev,
+      dependencies: prev.dependencies?.filter((id: string) => id !== idToRemove)
     }))
   }
 
@@ -80,6 +105,10 @@ export default function CreatePage({ onNavigate }: CreatePageProps) {
 
     if (todo.tags?.length === 0) {
       delete todo.tags
+    }
+
+    if (todo.dependencies?.length === 0) {
+      delete todo.dependencies
     }
 
     const isValid = validateTodo(todo)
@@ -220,6 +249,44 @@ export default function CreatePage({ onNavigate }: CreatePageProps) {
             </div>
           )}
         </div>
+
+        <div className="space-y-2">
+          <Label htmlFor="dependencies">Dependencies (前提タスク)</Label>
+          <div className="flex gap-2">
+            <Select
+              id="dependencies"
+              name="dependencies"
+              value={depInput}
+              onChange={(e) => setDepInput(e.target.value)}
+              options={[
+                { label: 'Select a task...', value: '' },
+                ...availableTodos
+                  .filter(t => !formData.dependencies?.includes(t.id))
+                  .map(t => ({ label: t.title, value: t.id }))
+              ]}
+              className="flex-1"
+            />
+            <Button type="button" variant="secondary" onClick={handleAddDependency} disabled={!depInput}>Add</Button>
+          </div>
+          {formData.dependencies && formData.dependencies.length > 0 && (
+            <div className="flex flex-col gap-2 mt-3 p-3 bg-gray-50 dark:bg-gray-800/50 rounded-lg border border-gray-100 dark:border-gray-700 max-h-40 overflow-y-auto">
+              {formData.dependencies.map((depId: string) => {
+                const depTask = availableTodos.find(t => t.id === depId)
+                return (
+                  <div key={depId} className="flex flex-wrap items-center justify-between gap-2 bg-white dark:bg-gray-800 p-2 rounded border border-gray-200 dark:border-gray-700 shadow-sm text-sm">
+                    <span className="truncate flex-1 font-medium text-gray-700 dark:text-gray-300">
+                      {depTask ? depTask.title : 'Unknown Task'}
+                    </span>
+                    <button type="button" onClick={() => handleRemoveDependency(depId)} className="text-gray-400 hover:text-red-500 shrink-0">
+                      &times; Remove
+                    </button>
+                  </div>
+                )
+              })}
+            </div>
+          )}
+        </div>
+
 
         <div className="pt-6 flex justify-end gap-3 border-t border-gray-200 dark:border-gray-700">
           <Button type="button" variant="ghost" onClick={() => onNavigate({ type: 'list' })}>
