@@ -81,10 +81,18 @@ export default function GanttPage({ onNavigate }: GanttPageProps) {
     let maxDate = today
 
     if (scheduledTodos.length > 0) {
-      const starts = scheduledTodos.map(t => new Date(t.start_date!))
-      const ends = scheduledTodos.map(t => new Date(t.end_date!))
-      minDate = new Date(Math.min(...starts.map(d => d.getTime())))
-      maxDate = new Date(Math.max(...ends.map(d => d.getTime())))
+      const starts = scheduledTodos.map(t => {
+        const d = new Date(t.start_date!)
+        d.setHours(0, 0, 0, 0)
+        return d.getTime()
+      })
+      const ends = scheduledTodos.map(t => {
+        const d = new Date(t.end_date!)
+        d.setHours(23, 59, 59, 999)
+        return d.getTime()
+      })
+      minDate = new Date(Math.min(...starts))
+      maxDate = new Date(Math.max(...ends))
     }
 
     // Pad range with 1 period on each side
@@ -168,8 +176,14 @@ export default function GanttPage({ onNavigate }: GanttPageProps) {
 
               {/* Rows */}
               {scheduledTodos.map(todo => {
-                const start = toPercent(new Date(todo.start_date!))
-                const end = toPercent(new Date(todo.end_date!))
+                const startDate = new Date(todo.start_date!)
+                startDate.setHours(0, 0, 0, 0)
+                const start = toPercent(startDate)
+
+                const endDate = new Date(todo.end_date!)
+                endDate.setHours(23, 59, 59, 999)
+                const end = toPercent(endDate)
+
                 const width = Math.max(0.5, end - start)
                 const colors = STATUS_COLORS[todo.status]
 
