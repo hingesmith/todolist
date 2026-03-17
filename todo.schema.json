@@ -73,6 +73,15 @@
         },
         "uniqueItems": true,
         "description": "タスクに関連付けられたタグのリスト"
+      },
+      "dependencies": {
+        "type": "array",
+        "items": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "uniqueItems": true,
+        "description": "このタスクを開始する前に完了していなければならない前提タスクのID（UUID）リスト"
       }
     },
     "additionalProperties": false
