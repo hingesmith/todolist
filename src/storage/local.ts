@@ -2,6 +2,23 @@ import { Todo } from '../types/todo'
 import { validateTodoList } from '../validation/schema'
 
 const STORAGE_KEY = 'todolist_data'
+const AI_SETTINGS_KEY = 'ai_settings'
+
+export type AiProvider = 'gemini' | 'local'
+
+export interface AiSettings {
+  provider: AiProvider
+  geminiModel: string
+  localEndpoint: string
+  localModel: string
+}
+
+export const defaultAiSettings: AiSettings = {
+  provider: 'gemini',
+  geminiModel: 'gemini-2.5-flash',
+  localEndpoint: 'http://localhost:11434/api/chat',
+  localModel: 'llama3'
+}
 
 export const storage = {
   getTodos: (): Todo[] => {
@@ -81,5 +98,23 @@ export const storage = {
   getTodo: (id: string): Todo | undefined => {
     const currentTodos = storage.getTodos()
     return currentTodos.find(t => t.id === id)
+  },
+
+  getAiSettings: (): AiSettings => {
+    try {
+      const data = localStorage.getItem(AI_SETTINGS_KEY)
+      if (!data) return defaultAiSettings
+      return { ...defaultAiSettings, ...JSON.parse(data) }
+    } catch {
+      return defaultAiSettings
+    }
+  },
+
+  setAiSettings: (settings: AiSettings): void => {
+    try {
+      localStorage.setItem(AI_SETTINGS_KEY, JSON.stringify(settings))
+    } catch (e) {
+      console.error('Failed to save AI settings', e)
+    }
   }
 }

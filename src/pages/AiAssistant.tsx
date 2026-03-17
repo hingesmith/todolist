@@ -16,6 +16,7 @@ type Message = { role: 'user' | 'assistant' | 'system', content: string | React.
 export default function AiAssistantPage({ onNavigate }: AiAssistantPageProps) {
   const [apiKey, setApiKey] = useState('')
   const [hasKey, setHasKey] = useState(false)
+  const [aiSettings, setAiSettings] = useState(storage.getAiSettings())
   const [messages, setMessages] = useState<Message[]>([
     { role: 'system', content: 'Gemini AI Assistant is ready. What kind of tasks do you need help planning?' }
   ])
@@ -30,23 +31,22 @@ export default function AiAssistantPage({ onNavigate }: AiAssistantPageProps) {
       setApiKey(savedKey)
       setHasKey(true)
     }
+    setAiSettings(storage.getAiSettings())
   }, [])
+
+  const isConfigured = aiSettings.provider === 'local' 
+    ? !!aiSettings.localEndpoint 
+    : hasKey
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [messages, pendingOperations])
 
-  const handleSaveKey = (e: React.FormEvent) => {
-    e.preventDefault()
-    if (apiKey.trim()) {
-      storage.setApiKey(apiKey.trim())
-      setHasKey(true)
-    }
-  }
+
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (!input.trim() || !hasKey) return
+    if (!input.trim() || !isConfigured) return
 
     const userPrompt = input.trim()
     setInput('')
@@ -63,7 +63,7 @@ export default function AiAssistantPage({ onNavigate }: AiAssistantPageProps) {
         content: typeof m.content === 'string' ? m.content : 'User interaction' 
       }))
       
-      const response = await generateOperationsFromChat(apiKey, chatContext, currentTodos)
+      const response = await generateOperationsFromChat(apiKey, aiSettings, chatContext, currentTodos)
       setPendingOperations(response.operations)
       setMessages(prev => [...prev, { role: 'assistant', content: response.message }])
     } catch (error) {
@@ -110,7 +110,7 @@ export default function AiAssistantPage({ onNavigate }: AiAssistantPageProps) {
     }, 1500)
   }
 
-  if (!hasKey) {
+  if (!isConfigured) {
     return (
       <div className="max-w-md mx-auto mt-12 bg-white dark:bg-gray-800 p-8 rounded-xl border border-gray-200 dark:border-gray-700 shadow-sm">
         <div className="flex flex-col items-center text-center space-y-4 mb-8">
@@ -118,22 +118,15 @@ export default function AiAssistantPage({ onNavigate }: AiAssistantPageProps) {
             <KeyRound size={32} />
           </div>
           <div>
-            <h2 className="text-xl font-bold text-gray-900 dark:text-gray-100">Set API Key</h2>
+            <h2 className="text-xl font-bold text-gray-900 dark:text-gray-100">AI Not Configured</h2>
             <p className="text-sm text-gray-500 dark:text-gray-400 mt-2">
-              Enter your Google Gemini API Key to use the AI Assistant. The key is stored securely in your browser's local storage.
+              Please go to the Settings page to configure your AI Provider (Gemini API Key or Local LLM Endpoint).
             </p>
           </div>
         </div>
-        <form onSubmit={handleSaveKey} className="space-y-4">
-          <Input
-            type="password"
-            placeholder="AIza..."
-            value={apiKey}
-            onChange={e => setApiKey(e.target.value)}
-            required
-          />
-          <Button type="submit" className="w-full">Save Key & Continue</Button>
-        </form>
+        <div className="flex justify-center">
+          <Button onClick={() => onNavigate({ type: 'settings' })}>Go to Settings</Button>
+        </div>
       </div>
     )
   }

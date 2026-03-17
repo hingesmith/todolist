@@ -6,6 +6,7 @@ import { KeyRound, Check, AlertCircle } from 'lucide-react'
 
 export default function SettingsPage() {
   const [apiKey, setApiKey] = useState('')
+  const [aiSettings, setAiSettings] = useState(storage.getAiSettings())
   const [saved, setSaved] = useState(false)
   const [hasExistingKey, setHasExistingKey] = useState(false)
 
@@ -19,12 +20,17 @@ export default function SettingsPage() {
 
   const handleSave = (e: React.FormEvent) => {
     e.preventDefault()
+    storage.setAiSettings(aiSettings)
     if (apiKey.trim()) {
       storage.setApiKey(apiKey.trim())
       setHasExistingKey(true)
-      setSaved(true)
-      setTimeout(() => setSaved(false), 2000)
+    } else if (aiSettings.provider === 'gemini') {
+      // If they switch to gemini without a key, clear existing key state just in case
+      storage.setApiKey('')
+      setHasExistingKey(false)
     }
+    setSaved(true)
+    setTimeout(() => setSaved(false), 2000)
   }
 
   const handleClear = () => {
@@ -47,8 +53,8 @@ export default function SettingsPage() {
             <KeyRound size={18} />
           </div>
           <div>
-            <h3 className="font-semibold text-gray-900 dark:text-gray-100">AI Assistant (Gemini)</h3>
-            <p className="text-xs text-gray-500 dark:text-gray-400">Your API key is stored only in your browser's local storage.</p>
+            <h3 className="font-semibold text-gray-900 dark:text-gray-100">AI Assistant Configuration</h3>
+            <p className="text-xs text-gray-500 dark:text-gray-400">Settings and keys are stored only in your browser's local storage.</p>
           </div>
         </div>
 
@@ -66,21 +72,110 @@ export default function SettingsPage() {
             </div>
           )}
 
-          <form onSubmit={handleSave} className="space-y-3">
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
-              Google Gemini API Key
-            </label>
-            <Input
-              type="password"
-              placeholder="AIza..."
-              value={apiKey}
-              onChange={e => setApiKey(e.target.value)}
-            />
-            <div className="flex items-center gap-3">
-              <Button type="submit" disabled={!apiKey.trim()}>
-                {saved ? <><Check size={14} /> Saved!</> : 'Save API Key'}
+          <form onSubmit={handleSave} className="space-y-4">
+            
+            {/* Provider Selection */}
+            <div className="space-y-2">
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                AI Provider
+              </label>
+              <div className="flex gap-4">
+                <label className="flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300">
+                  <input
+                    type="radio"
+                    checked={aiSettings.provider === 'gemini'}
+                    onChange={() => setAiSettings({ ...aiSettings, provider: 'gemini' })}
+                    className="text-indigo-600"
+                  />
+                  Google Gemini (Cloud)
+                </label>
+                <label className="flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300">
+                  <input
+                    type="radio"
+                    checked={aiSettings.provider === 'local'}
+                    onChange={() => setAiSettings({ ...aiSettings, provider: 'local' })}
+                    className="text-indigo-600"
+                  />
+                  Local LLM
+                </label>
+              </div>
+            </div>
+
+            {/* Gemini Settings */}
+            {aiSettings.provider === 'gemini' && (
+              <div className="space-y-4 p-4 bg-gray-50 dark:bg-gray-800/50 rounded-lg border border-gray-100 dark:border-gray-700">
+                <div className="space-y-2">
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                    Gemini Model
+                  </label>
+                  <select
+                    value={aiSettings.geminiModel}
+                    onChange={e => setAiSettings({ ...aiSettings, geminiModel: e.target.value })}
+                    className="w-full rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 px-3 py-2 text-sm text-gray-900 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-400 shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                  >
+                    <option value="gemini-2.5-flash">Gemini 2.5 Flash (Fast, Default)</option>
+                    <option value="gemini-2.5-pro">Gemini 2.5 Pro (Advanced)</option>
+                    <option value="gemini-2.0-flash">Gemini 2.0 Flash</option>
+                    <option value="gemini-1.5-flash">Gemini 1.5 Flash</option>
+                    <option value="gemini-1.5-pro">Gemini 1.5 Pro</option>
+                  </select>
+                </div>
+                <div className="space-y-2">
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                    Google Gemini API Key
+                  </label>
+                  <Input
+                    type="password"
+                    placeholder={hasExistingKey ? '••••••••••••••••' : 'AIza...'}
+                    value={apiKey}
+                    onChange={e => setApiKey(e.target.value)}
+                  />
+                  <p className="text-xs text-gray-400 dark:text-gray-500">
+                    Get a free Gemini API key from{' '}
+                    <a href="https://aistudio.google.com/app/apikey" target="_blank" rel="noreferrer" className="underline hover:text-indigo-500">
+                      Google AI Studio
+                    </a>.
+                  </p>
+                </div>
+              </div>
+            )}
+
+            {/* Local LLM Settings */}
+            {aiSettings.provider === 'local' && (
+              <div className="space-y-4 p-4 bg-gray-50 dark:bg-gray-800/50 rounded-lg border border-gray-100 dark:border-gray-700">
+                <div className="space-y-2">
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                    API Endpoint URL
+                  </label>
+                  <Input
+                    type="text"
+                    placeholder="http://localhost:11434/v1/chat/completions"
+                    value={aiSettings.localEndpoint}
+                    onChange={e => setAiSettings({ ...aiSettings, localEndpoint: e.target.value })}
+                  />
+                  <p className="text-xs text-gray-500 dark:text-gray-400">
+                    OpenAI compatible endpoint. e.g. for Ollama use <code>http://localhost:11434/v1/chat/completions</code> or <code>/api/chat</code> depending on client logic.
+                  </p>
+                </div>
+                <div className="space-y-2">
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                    Model Name
+                  </label>
+                  <Input
+                    type="text"
+                    placeholder="llama3, gemma:2b, etc."
+                    value={aiSettings.localModel}
+                    onChange={e => setAiSettings({ ...aiSettings, localModel: e.target.value })}
+                  />
+                </div>
+              </div>
+            )}
+
+            <div className="flex items-center gap-3 pt-4 border-t border-gray-200 dark:border-gray-700">
+              <Button type="submit">
+                {saved ? <><Check size={14} /> Saved!</> : 'Save Settings'}
               </Button>
-              {hasExistingKey && (
+              {hasExistingKey && aiSettings.provider === 'gemini' && (
                 <button
                   type="button"
                   onClick={handleClear}
@@ -91,13 +186,6 @@ export default function SettingsPage() {
               )}
             </div>
           </form>
-          <p className="text-xs text-gray-400 dark:text-gray-500">
-            Get a free Gemini API key from{' '}
-            <a href="https://aistudio.google.com/app/apikey" target="_blank" rel="noreferrer" className="underline hover:text-indigo-500">
-              Google AI Studio
-            </a>
-            .
-          </p>
         </div>
       </div>
     </div>

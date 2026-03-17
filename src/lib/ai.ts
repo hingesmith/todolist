@@ -1,5 +1,6 @@
 import { GoogleGenAI } from '@google/genai'
 import { Todo } from '../types/todo'
+import { AiSettings } from '../storage/local'
 
 export type AiOperation = 
   | { type: 'add'; reasoning?: string; todo: Omit<Todo, 'id' | 'created_at'> }
@@ -57,51 +58,104 @@ const SYSTEM_INSTRUCTION = `
 `
 
 export async function generateOperationsFromChat(
-  apiKey: string, 
+  apiKey: string | null,
+  settings: AiSettings,
   messages: { role: 'user' | 'assistant' | 'system', content: string }[],
   currentTodos: Todo[]
 ): Promise<AiOperationResponse> {
-  const ai = new GoogleGenAI({ apiKey })
+  const stateContext = `現在のタスク一覧:\n\`\`\`json\n${JSON.stringify(currentTodos, null, 2)}\n\`\`\``
 
   try {
-    // We append the current state JSON to the system instruction or as the very first context message
-    const stateContext = `現在のタスク一覧:\n\`\`\`json\n${JSON.stringify(currentTodos, null, 2)}\n\`\`\``
+    let parsed: AiOperationResponse | null = null
 
-    const formattedContents = messages
-      .filter(m => m.role !== 'system') // Gemini standard chat prefers user/model alternating
-      .map(m => ({
-        role: m.role === 'assistant' ? 'model' : 'user',
-        parts: [{ text: m.content }]
-      }))
-      
-    // Inject the state context into the last user message so the model has the freshest data
-    if (formattedContents.length > 0 && formattedContents[formattedContents.length - 1].role === 'user') {
-      formattedContents[formattedContents.length - 1].parts[0].text += `\n\n${stateContext}`
-    } else {
-      // Fallback if the last message isn't user (unlikely in our flow)
-      formattedContents.push({
-        role: 'user',
-        parts: [{ text: stateContext }]
-      })
-    }
+    if (settings.provider === 'gemini') {
+      if (!apiKey) throw new Error("Gemini API key is required but not set.")
+      const ai = new GoogleGenAI({ apiKey })
 
-    const response = await ai.models.generateContent({
-      model: 'gemini-2.5-flash',
-      contents: formattedContents,
-      config: {
-        systemInstruction: SYSTEM_INSTRUCTION,
-        responseMimeType: 'application/json',
-        temperature: 0.1,
+      const formattedContents = messages
+        .filter(m => m.role !== 'system') // Gemini standard chat prefers user/model alternating
+        .map(m => ({
+          role: m.role === 'assistant' ? 'model' : 'user',
+          parts: [{ text: m.content }]
+        }))
+        
+      if (formattedContents.length > 0 && formattedContents[formattedContents.length - 1].role === 'user') {
+        formattedContents[formattedContents.length - 1].parts[0].text += `\n\n${stateContext}`
+      } else {
+        formattedContents.push({ role: 'user', parts: [{ text: stateContext }] })
       }
-    })
 
-    const text = response.text
-    if (!text) {
-      throw new Error("No text returned from Gemini API")
+      const response = await ai.models.generateContent({
+        model: settings.geminiModel,
+        contents: formattedContents,
+        config: {
+          systemInstruction: SYSTEM_INSTRUCTION,
+          responseMimeType: 'application/json',
+          temperature: 0.1,
+        }
+      })
+
+      const text = response.text
+      if (!text) throw new Error("No text returned from Gemini API")
+      parsed = JSON.parse(text)
+
+    } else if (settings.provider === 'local') {
+      // Logic for local LLM (OpenAI compatible endpoint)
+      if (!settings.localEndpoint) throw new Error("Local LLM Endpoint URL is not set.")
+      
+      const payloadMessages = [
+        { role: 'system', content: SYSTEM_INSTRUCTION },
+        ...messages.filter(m => m.role !== 'system'),
+      ]
+      
+      // Inject state into the last user message
+      let lastUserIdx = -1
+      for (let i = payloadMessages.length - 1; i >= 0; i--) {
+        if (payloadMessages[i].role === 'user') {
+          lastUserIdx = i
+          break
+        }
+      }
+      if (lastUserIdx >= 0) {
+        payloadMessages[lastUserIdx].content += `\n\n${stateContext}`
+      } else {
+        payloadMessages.push({ role: 'user', content: stateContext })
+      }
+
+      const response = await fetch(settings.localEndpoint, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          model: settings.localModel,
+          messages: payloadMessages,
+          response_format: { type: "json_object" }, // Attempt to force JSON output
+          temperature: 0.1,
+          stream: false
+        })
+      })
+
+      if (!response.ok) {
+        const errText = await response.text()
+        throw new Error(`Local LLM Error: ${response.status} ${errText}`)
+      }
+
+      const data = await response.json()
+      const text = data.choices?.[0]?.message?.content
+      if (!text) throw new Error("No response content from Local LLM")
+      
+      // Parse JSON (Local LLMs sometimes wrap in markdown code blocks even with json_object format)
+      const cleanText = text.replace(/^```json/im, '').replace(/```$/im, '').trim()
+      try {
+        parsed = JSON.parse(cleanText)
+      } catch (e) {
+        throw new Error(`Failed to parse Local LLM response as JSON. Response: ${text}`)
+      }
     }
 
-    const parsed: AiOperationResponse = JSON.parse(text)
-    
+    if (!parsed) throw new Error("Failed to receive or parse AI response")
+
     // Validate types basic fields
     const validOperations = (parsed.operations || []).filter(op => {
       if (op.type === 'add') return !!op.todo?.title

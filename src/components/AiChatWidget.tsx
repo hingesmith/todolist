@@ -14,6 +14,7 @@ interface AiChatWidgetProps {
 
 export default function AiChatWidget({ onNavigateToSettings }: AiChatWidgetProps) {
   const [apiKey, setApiKey] = useState<string | null>(null)
+  const [aiSettings, setAiSettings] = useState(storage.getAiSettings())
   const [messages, setMessages] = useState<Message[]>([
     { role: 'system', content: 'AI Assistant ready. Tell me what tasks you need!' }
   ])
@@ -23,8 +24,8 @@ export default function AiChatWidget({ onNavigateToSettings }: AiChatWidgetProps
   const messagesEndRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
-    const key = storage.getApiKey()
-    setApiKey(key)
+    setApiKey(storage.getApiKey())
+    setAiSettings(storage.getAiSettings())
   }, [])
 
   useEffect(() => {
@@ -33,7 +34,11 @@ export default function AiChatWidget({ onNavigateToSettings }: AiChatWidgetProps
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (!input.trim() || !apiKey) return
+    if (!input.trim()) return
+    
+    // Validate config before proceeding
+    if (aiSettings.provider === 'gemini' && !apiKey) return
+    if (aiSettings.provider === 'local' && !aiSettings.localEndpoint) return
 
     const userPrompt = input.trim()
     setInput('')
@@ -44,7 +49,7 @@ export default function AiChatWidget({ onNavigateToSettings }: AiChatWidgetProps
 
     try {
       const currentTodos = storage.getTodos()
-      const response = await generateOperationsFromChat(apiKey, newMessages, currentTodos)
+      const response = await generateOperationsFromChat(apiKey, aiSettings, newMessages, currentTodos)
       setPendingOperations(response.operations)
       setMessages(prev => [...prev, { role: 'assistant', content: response.message }])
     } catch (error) {
@@ -91,12 +96,26 @@ export default function AiChatWidget({ onNavigateToSettings }: AiChatWidgetProps
         </div>
       </div>
 
-      {/* No API Key Warning */}
-      {!apiKey && (
+      {/* Configuration Warnings */}
+      {aiSettings.provider === 'gemini' && !apiKey && (
         <div className="mx-4 mt-3 mb-0 p-3 rounded-lg bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 text-sm text-amber-800 dark:text-amber-300 flex flex-col gap-2 shrink-0">
           <div className="flex items-start gap-2">
             <AlertCircle size={14} className="shrink-0 mt-0.5" />
             <span>Gemini API key not set. Please add it in Settings.</span>
+          </div>
+          <button
+            onClick={() => onNavigateToSettings()}
+            className="text-indigo-600 dark:text-indigo-400 underline text-xs text-left w-fit hover:text-indigo-800 dark:hover:text-indigo-200 transition-colors"
+          >
+            Go to Settings →
+          </button>
+        </div>
+      )}
+      {aiSettings.provider === 'local' && !aiSettings.localEndpoint && (
+        <div className="mx-4 mt-3 mb-0 p-3 rounded-lg bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 text-sm text-amber-800 dark:text-amber-300 flex flex-col gap-2 shrink-0">
+          <div className="flex items-start gap-2">
+            <AlertCircle size={14} className="shrink-0 mt-0.5" />
+            <span>Local LLM endpoint is not configured. Please set it in Settings.</span>
           </div>
           <button
             onClick={() => onNavigateToSettings()}
@@ -167,18 +186,22 @@ export default function AiChatWidget({ onNavigateToSettings }: AiChatWidgetProps
       )}
 
       {/* Input */}
-          <form onSubmit={handleSubmit} className="flex gap-2 p-3 border-t border-gray-200 dark:border-gray-700 shrink-0">
-            <Input
-              value={input}
-              onChange={e => setInput(e.target.value)}
-              placeholder={apiKey ? 'Ask me to add, edit, or delete tasks…' : 'Set API key in Settings first'}
-              className="flex-1 text-sm"
-              disabled={isLoading || !apiKey}
-            />
-            <Button type="submit" disabled={!input.trim() || isLoading || !apiKey} className="shrink-0 px-3">
-              <Send size={16} />
-            </Button>
-          </form>
+      <form onSubmit={handleSubmit} className="flex gap-2 p-3 border-t border-gray-200 dark:border-gray-700 shrink-0">
+        <Input
+          value={input}
+          onChange={e => setInput(e.target.value)}
+          placeholder={
+            aiSettings.provider === 'local'
+              ? aiSettings.localEndpoint ? 'Ask me to add, edit, or delete tasks…' : 'Set Local LLM Endpoint in Settings first'
+              : apiKey ? 'Ask me to add, edit, or delete tasks…' : 'Set Gemini API key in Settings first'
+          }
+          className="flex-1 text-sm"
+          disabled={isLoading || (aiSettings.provider === 'gemini' && !apiKey) || (aiSettings.provider === 'local' && !aiSettings.localEndpoint)}
+        />
+        <Button type="submit" disabled={!input.trim() || isLoading || (aiSettings.provider === 'gemini' && !apiKey) || (aiSettings.provider === 'local' && !aiSettings.localEndpoint)} className="shrink-0 px-3">
+          <Send size={16} />
+        </Button>
+      </form>
     </div>
   )
 }
