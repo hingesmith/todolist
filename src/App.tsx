@@ -133,10 +133,10 @@ function App() {
   }
 
   return (
-    <div className="flex min-h-screen bg-gray-50 dark:bg-gray-900 transition-colors duration-200">
+    <div className="flex h-dvh overflow-hidden bg-gray-50 dark:bg-gray-900 transition-colors duration-200">
 
       {/* Desktop sidebar */}
-      <nav className="hidden sm:flex w-64 bg-white dark:bg-gray-800 shadow-md flex-shrink-0 flex-col h-screen sticky top-0 overflow-hidden">
+      <nav className="hidden sm:flex w-64 bg-white dark:bg-gray-800 shadow-md flex-shrink-0 flex-col overflow-hidden">
         <div className="p-6 shrink-0">
           <h1
             className="text-2xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-blue-600 to-indigo-600 cursor-pointer"
@@ -184,7 +184,7 @@ function App() {
       )}
 
       {/* Content area */}
-      <div className="flex-1 flex flex-col h-screen overflow-hidden">
+      <div className="flex-1 flex flex-col overflow-hidden min-h-0">
         {/* Mobile header */}
         <header className="sm:hidden flex items-center gap-3 h-14 px-4 bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 shrink-0">
           <button
