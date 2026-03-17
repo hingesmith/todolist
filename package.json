@@ -1,12 +1,13 @@
 {
   "name": "todolist",
-  "private": true,
   "version": "0.0.0",
   "type": "module",
+  "homepage": "https://hingesmith.github.io/todolist/",
   "scripts": {
     "dev": "vite",
     "build": "tsc && vite build",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "deploy": "gh-pages -d dist"
   },
   "dependencies": {
     "@google/genai": "^1.45.0",
@@ -24,6 +25,7 @@
     "@types/uuid": "^9.0.8",
     "@vitejs/plugin-react": "^4.2.1",
     "autoprefixer": "^10.4.27",
+    "gh-pages": "^6.3.0",
     "postcss": "^8.5.8",
     "tailwindcss": "^4.2.1",
     "typescript": "^5.2.2",
