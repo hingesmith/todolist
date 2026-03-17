@@ -2,8 +2,9 @@ import React, { useState, useEffect, useRef } from 'react'
 import { storage } from '../storage/local'
 import { Todo } from '../types/todo'
 import { Button } from './ui/Button'
-import { Input } from './ui/Input'
 import { Sparkles, Send, Loader2, Check, Plus, Edit2, Trash2, AlertCircle } from 'lucide-react'
+import ReactMarkdown from 'react-markdown'
+import remarkGfm from 'remark-gfm'
 import { generateOperationsFromChat, AiOperation } from '../lib/ai'
 
 type Message = { role: 'user' | 'assistant' | 'system', content: string }
@@ -23,6 +24,8 @@ export default function AiChatWidget({ onNavigateToSettings }: AiChatWidgetProps
   const [pendingOperations, setPendingOperations] = useState<AiOperation[]>([])
   const messagesEndRef = useRef<HTMLDivElement>(null)
 
+  const textareaRef = useRef<HTMLTextAreaElement>(null)
+
   useEffect(() => {
     setApiKey(storage.getApiKey())
     setAiSettings(storage.getAiSettings())
@@ -32,8 +35,20 @@ export default function AiChatWidget({ onNavigateToSettings }: AiChatWidgetProps
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [messages, pendingOperations])
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault()
+  const autoResizeTextarea = () => {
+    const el = textareaRef.current
+    if (el) {
+      el.style.height = 'auto'
+      el.style.height = `${Math.min(el.scrollHeight, 120)}px`
+    }
+  }
+
+  useEffect(() => {
+    autoResizeTextarea()
+  }, [input])
+
+  const handleSubmit = async (e?: React.FormEvent) => {
+    if (e) e.preventDefault()
     if (!input.trim()) return
     
     // Validate config before proceeding
@@ -57,6 +72,13 @@ export default function AiChatWidget({ onNavigateToSettings }: AiChatWidgetProps
       setMessages(prev => [...prev, { role: 'assistant', content: `Error: ${errMsg}` }])
     } finally {
       setIsLoading(false)
+    }
+  }
+
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
+      e.preventDefault()
+      handleSubmit()
     }
   }
 
@@ -132,12 +154,20 @@ export default function AiChatWidget({ onNavigateToSettings }: AiChatWidgetProps
           {messages.map((msg, i) => (
             <div key={i} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
               <div className={`max-w-[85%] rounded-2xl px-3 py-2 text-sm ${msg.role === 'user'
-                  ? 'bg-indigo-600 text-white rounded-br-none'
+                  ? 'bg-indigo-600 text-white rounded-br-none whitespace-pre-wrap flex items-center'
                   : msg.role === 'system'
                     ? 'bg-gray-100 dark:bg-gray-800 text-gray-500 dark:text-gray-400 text-xs text-center mx-auto'
                     : 'bg-gray-100 dark:bg-gray-800 text-gray-800 dark:text-gray-100 rounded-bl-none'
                 }`}>
-                {msg.content}
+                {msg.role === 'user' ? (
+                  msg.content
+                ) : (
+                  <div className="prose prose-sm dark:prose-invert max-w-none prose-p:leading-relaxed prose-pre:bg-gray-900 prose-pre:text-gray-100">
+                    <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                      {msg.content}
+                    </ReactMarkdown>
+                  </div>
+                )}
               </div>
             </div>
           ))}
@@ -186,19 +216,22 @@ export default function AiChatWidget({ onNavigateToSettings }: AiChatWidgetProps
       )}
 
       {/* Input */}
-      <form onSubmit={handleSubmit} className="flex gap-2 p-3 border-t border-gray-200 dark:border-gray-700 shrink-0">
-        <Input
+      <form onSubmit={handleSubmit} className="flex gap-2 p-3 border-t border-gray-200 dark:border-gray-700 shrink-0 items-end">
+        <textarea
+          ref={textareaRef}
           value={input}
           onChange={e => setInput(e.target.value)}
+          onKeyDown={handleKeyDown}
           placeholder={
             aiSettings.provider === 'local'
-              ? aiSettings.localEndpoint ? 'Ask me to add, edit, or delete tasks…' : 'Set Local LLM Endpoint in Settings first'
-              : apiKey ? 'Ask me to add, edit, or delete tasks…' : 'Set Gemini API key in Settings first'
+              ? aiSettings.localEndpoint ? 'Ask me to add, edit, or delete tasks (Ctrl+Enter to send)' : 'Set Local LLM Endpoint in Settings first'
+              : apiKey ? 'Ask me to add, edit, or delete tasks (Ctrl+Enter to send)' : 'Set Gemini API key in Settings first'
           }
-          className="flex-1 text-sm"
+          className="flex-1 text-sm bg-transparent border border-gray-300 dark:border-gray-600 rounded-lg p-2 resize-none focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500 dark:text-gray-100 outline-none max-h-[120px] overflow-y-auto [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]"
+          rows={1}
           disabled={isLoading || (aiSettings.provider === 'gemini' && !apiKey) || (aiSettings.provider === 'local' && !aiSettings.localEndpoint)}
         />
-        <Button type="submit" disabled={!input.trim() || isLoading || (aiSettings.provider === 'gemini' && !apiKey) || (aiSettings.provider === 'local' && !aiSettings.localEndpoint)} className="shrink-0 px-3">
+        <Button type="submit" disabled={!input.trim() || isLoading || (aiSettings.provider === 'gemini' && !apiKey) || (aiSettings.provider === 'local' && !aiSettings.localEndpoint)} className="shrink-0 px-3 h-10 mb-[1px]">
           <Send size={16} />
         </Button>
       </form>

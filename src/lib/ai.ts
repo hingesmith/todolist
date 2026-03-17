@@ -70,7 +70,8 @@ export async function generateOperationsFromChat(
 
     if (settings.provider === 'gemini') {
       if (!apiKey) throw new Error("Gemini API key is required but not set.")
-      const ai = new GoogleGenAI({ apiKey })
+      const cleanKey = apiKey.trim().replace(/[^\x20-\x7E]/g, '')
+      const ai = new GoogleGenAI({ apiKey: cleanKey })
 
       const formattedContents = messages
         .filter(m => m.role !== 'system') // Gemini standard chat prefers user/model alternating
@@ -122,13 +123,15 @@ export async function generateOperationsFromChat(
         payloadMessages.push({ role: 'user', content: stateContext })
       }
 
-      const response = await fetch(settings.localEndpoint, {
+      const sanitizedEndpoint = encodeURI(settings.localEndpoint.trim())
+
+      const response = await fetch(sanitizedEndpoint, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json'
         },
         body: JSON.stringify({
-          model: settings.localModel,
+          model: settings.localModel.trim(),
           messages: payloadMessages,
           response_format: { type: "json_object" }, // Attempt to force JSON output
           temperature: 0.1,

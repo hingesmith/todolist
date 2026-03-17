@@ -3,8 +3,9 @@ import { PageState } from '../App'
 import { storage } from '../storage/local'
 import { Todo } from '../types/todo'
 import { Button } from '../components/ui/Button'
-import { Input } from '../components/ui/Input'
 import { KeyRound, Sparkles, Send, Loader2, Check, Plus, Edit2, Trash2 } from 'lucide-react'
+import ReactMarkdown from 'react-markdown'
+import remarkGfm from 'remark-gfm'
 import { generateOperationsFromChat, AiOperation } from '../lib/ai'
 
 interface AiAssistantPageProps {
@@ -24,6 +25,7 @@ export default function AiAssistantPage({ onNavigate }: AiAssistantPageProps) {
   const [isLoading, setIsLoading] = useState(false)
   const [pendingOperations, setPendingOperations] = useState<AiOperation[]>([])
   const messagesEndRef = useRef<HTMLDivElement>(null)
+  const textareaRef = useRef<HTMLTextAreaElement>(null)
 
   useEffect(() => {
     const savedKey = storage.getApiKey()
@@ -38,14 +40,33 @@ export default function AiAssistantPage({ onNavigate }: AiAssistantPageProps) {
     ? !!aiSettings.localEndpoint 
     : hasKey
 
+  const autoResizeTextarea = () => {
+    const el = textareaRef.current
+    if (el) {
+      el.style.height = 'auto'
+      el.style.height = `${Math.min(el.scrollHeight, 150)}px`
+    }
+  }
+
+  useEffect(() => {
+    autoResizeTextarea()
+  }, [input])
+
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [messages, pendingOperations])
 
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
+      e.preventDefault()
+      handleSubmit()
+    }
+  }
 
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault()
+
+  const handleSubmit = async (e?: React.FormEvent) => {
+    if (e) e.preventDefault()
     if (!input.trim() || !isConfigured) return
 
     const userPrompt = input.trim()
@@ -155,12 +176,20 @@ export default function AiAssistantPage({ onNavigate }: AiAssistantPageProps) {
           <div key={i} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
             <div className={`max-w-[80%] rounded-2xl px-4 py-3 ${
               msg.role === 'user'
-                ? 'bg-indigo-600 text-white rounded-br-none'
+                ? 'bg-indigo-600 text-white rounded-br-none whitespace-pre-wrap flex items-center'
                 : msg.role === 'system'
                 ? 'bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400 text-sm mx-auto'
                 : 'bg-white dark:bg-gray-800 text-gray-800 dark:text-gray-100 border border-gray-200 dark:border-gray-700 rounded-bl-none shadow-sm'
             }`}>
-              {msg.content}
+              {msg.role === 'user' || typeof msg.content !== 'string' ? (
+                msg.content
+              ) : (
+                <div className="prose prose-sm dark:prose-invert max-w-none prose-p:leading-relaxed prose-pre:bg-gray-900 prose-pre:text-gray-100">
+                  <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                    {msg.content}
+                  </ReactMarkdown>
+                </div>
+              )}
             </div>
           </div>
         ))}
@@ -228,18 +257,21 @@ export default function AiAssistantPage({ onNavigate }: AiAssistantPageProps) {
 
       {/* Input Area */}
       <div className="bg-white dark:bg-gray-800 border-t border-gray-200 dark:border-gray-700 p-4 -mx-8 sm:px-8 mt-auto sticky bottom-0">
-        <form onSubmit={handleSubmit} className="flex gap-2 max-w-4xl mx-auto">
-          <Input
+        <form onSubmit={handleSubmit} className="flex gap-2 max-w-4xl mx-auto items-end">
+          <textarea
+            ref={textareaRef}
             value={input}
             onChange={e => setInput(e.target.value)}
-            placeholder="e.g. Break down the process of planning a team offsite next Friday"
-            className="flex-1 bg-gray-50 dark:bg-gray-900 border-transparent focus:bg-white dark:focus:bg-gray-800"
+            onKeyDown={handleKeyDown}
+            placeholder="e.g. Break down the process of planning a team offsite next Friday (Ctrl+Enter to send)"
+            className="flex-1 bg-gray-50 dark:bg-gray-900 border border-transparent focus:bg-white dark:focus:bg-gray-800 rounded-lg p-2.5 text-sm resize-none focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500 dark:text-gray-100 outline-none max-h-[150px] overflow-y-auto [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]"
+            rows={1}
             disabled={isLoading}
           />
           <Button 
             type="submit" 
             disabled={!input.trim() || isLoading}
-            className="shrink-0"
+            className="shrink-0 h-[42px] mb-[1px]"
           >
             <Send size={18} />
           </Button>
