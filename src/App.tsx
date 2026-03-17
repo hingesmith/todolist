@@ -80,17 +80,21 @@ function App() {
         </div>
       </nav>
 
-      <main className="flex-1 overflow-x-hidden p-8 transition-all duration-300">
-        <div className="mx-auto w-full min-w-0">
-          {page.type === 'list' && <ListPage onNavigate={navigateTo} />}
-          {page.type === 'board' && <BoardPage onNavigate={navigateTo} />}
-          {page.type === 'gantt' && <GanttPage onNavigate={navigateTo} />}
-          {page.type === 'settings' && <SettingsPage />}
-          {page.type === 'create' && <CreatePage onNavigate={navigateTo} />}
-          {page.type === 'edit' && <EditPage id={page.id} onNavigate={navigateTo} />}
-        </div>
-      </main>
-      <AiChatWidget onNavigateToSettings={() => navigateTo({ type: 'settings' })} />
+      <div className="flex-1 flex flex-col h-screen overflow-hidden">
+        <main className="flex-1 overflow-y-auto overflow-x-hidden p-8 transition-all duration-300">
+          <div className="mx-auto w-full min-w-0">
+            {page.type === 'list' && <ListPage onNavigate={navigateTo} />}
+            {page.type === 'board' && <BoardPage onNavigate={navigateTo} />}
+            {page.type === 'gantt' && <GanttPage onNavigate={navigateTo} />}
+            {page.type === 'settings' && <SettingsPage />}
+            {page.type === 'create' && <CreatePage onNavigate={navigateTo} />}
+            {page.type === 'edit' && <EditPage id={page.id} onNavigate={navigateTo} />}
+          </div>
+        </main>
+        {page.type !== 'settings' && (
+          <AiChatWidget onNavigateToSettings={() => navigateTo({ type: 'settings' })} />
+        )}
+      </div>
     </div>
   )
 }
