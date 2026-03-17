@@ -141,7 +141,7 @@ export default function ListPage({ onNavigate }: ListPageProps) {
                     <Badge status={todo.status}>{statusText[todo.status]}</Badge>
                     <Badge priority={todo.priority}>{prioritizeText[todo.priority || 'medium']}</Badge>
                     <button
-                      className="opacity-0 group-hover:opacity-100 transition-opacity text-red-500 hover:text-red-700 px-2"
+                      className="sm:opacity-0 sm:group-hover:opacity-100 transition-opacity text-red-500 hover:text-red-700 px-2"
                       onClick={(e) => handleDelete(todo.id, e)}
                     >
                       Delete
