@@ -9,6 +9,8 @@ interface GanttPageProps {
   onNavigate: (page: PageState) => void
 }
 
+const ROW_HEIGHT = 64
+
 type Scale = 'day' | 'week' | 'month'
 
 function startOf(date: Date, scale: Scale): Date {
@@ -41,17 +43,15 @@ function addPeriod(date: Date, scale: Scale, n: number): Date {
 function formatPeriodLabel(date: Date, scale: Scale): string {
   if (scale === 'month') {
     return date.toLocaleDateString('ja-JP', { year: 'numeric', month: 'short' })
-  } else if (scale === 'week') {
-    return date.toLocaleDateString('ja-JP', { month: 'short', day: 'numeric' })
   } else {
     return date.toLocaleDateString('ja-JP', { month: 'short', day: 'numeric' })
   }
 }
 
-const STATUS_COLORS: Record<TodoStatus, { bg: string; border: string; text: string }> = {
-  todo:        { bg: 'bg-blue-500',  border: 'border-blue-600',  text: 'text-blue-900' },
-  in_progress: { bg: 'bg-red-500',   border: 'border-red-600',   text: 'text-red-900' },
-  done:        { bg: 'bg-green-500', border: 'border-green-600', text: 'text-green-900' },
+const STATUS_COLORS: Record<TodoStatus, { bg: string }> = {
+  todo:        { bg: 'bg-blue-500' },
+  in_progress: { bg: 'bg-red-500' },
+  done:        { bg: 'bg-green-500' },
 }
 
 export default function GanttPage({ onNavigate }: GanttPageProps) {
@@ -59,11 +59,33 @@ export default function GanttPage({ onNavigate }: GanttPageProps) {
   const [scale, setScale] = React.useState<Scale>('week')
   const [tooltip, setTooltip] = React.useState<{ todo: Todo; x: number; y: number } | null>(null)
 
+  // For dependency arrow measurement
+  const rowsDivRef = React.useRef<HTMLDivElement | null>(null)
+  const resizeObserverRef = React.useRef<ResizeObserver | null>(null)
+  const barRefs = React.useRef<Map<string, HTMLDivElement>>(new Map())
+  const [arrowData, setArrowData] = React.useState<Array<{ key: string; d: string }>>([])
+  const [svgDims, setSvgDims] = React.useState({ w: 0, h: 0 })
+  const [measureTick, setMeasureTick] = React.useState(0)
+
+  // Callback ref: fires when rows container mounts/unmounts
+  const rowsContainerRef = React.useCallback((node: HTMLDivElement | null) => {
+    rowsDivRef.current = node
+    if (resizeObserverRef.current) {
+      resizeObserverRef.current.disconnect()
+      resizeObserverRef.current = null
+    }
+    if (node) {
+      resizeObserverRef.current = new ResizeObserver(() => {
+        setMeasureTick(t => t + 1)
+      })
+      resizeObserverRef.current.observe(node)
+    }
+  }, [])
+
   React.useEffect(() => {
     setTodos(storage.getTodos())
   }, [])
 
-  // Split todos into scheduled (has both dates) and unscheduled
   const scheduledTodos = React.useMemo(
     () => todos.filter(t => t.start_date && t.end_date),
     [todos]
@@ -73,33 +95,21 @@ export default function GanttPage({ onNavigate }: GanttPageProps) {
     [todos]
   )
 
-  // Calculate display range
   const { rangeStart, rangeEnd, periods } = React.useMemo(() => {
     const today = new Date()
-
     let minDate = today
     let maxDate = today
 
     if (scheduledTodos.length > 0) {
-      const starts = scheduledTodos.map(t => {
-        const d = new Date(t.start_date!)
-        d.setHours(0, 0, 0, 0)
-        return d.getTime()
-      })
-      const ends = scheduledTodos.map(t => {
-        const d = new Date(t.end_date!)
-        d.setHours(23, 59, 59, 999)
-        return d.getTime()
-      })
+      const starts = scheduledTodos.map(t => { const d = new Date(t.start_date!); d.setHours(0,0,0,0); return d.getTime() })
+      const ends   = scheduledTodos.map(t => { const d = new Date(t.end_date!);   d.setHours(23,59,59,999); return d.getTime() })
       minDate = new Date(Math.min(...starts))
       maxDate = new Date(Math.max(...ends))
     }
 
-    // Pad range with 1 period on each side
     const start = startOf(addPeriod(minDate, scale, -1), scale)
-    const end = addPeriod(startOf(maxDate, scale), scale, 2)
+    const end   = addPeriod(startOf(maxDate, scale), scale, 2)
 
-    // Build period columns
     const cols: Date[] = []
     let cur = new Date(start)
     while (cur < end) {
@@ -117,6 +127,43 @@ export default function GanttPage({ onNavigate }: GanttPageProps) {
   }
 
   const todayPct = toPercent(new Date())
+
+  // Measure bar positions and build SVG arrow paths
+  React.useLayoutEffect(() => {
+    const container = rowsDivRef.current
+    if (!container) return
+
+    const containerRect = container.getBoundingClientRect()
+    setSvgDims({ w: containerRect.width, h: containerRect.height })
+
+    const paths: Array<{ key: string; d: string }> = []
+
+    scheduledTodos.forEach(todo => {
+      if (!todo.dependencies?.length) return
+      todo.dependencies.forEach(depId => {
+        const fromEl = barRefs.current.get(depId)
+        const toEl   = barRefs.current.get(todo.id)
+        if (!fromEl || !toEl) return
+
+        const fromRect = fromEl.getBoundingClientRect()
+        const toRect   = toEl.getBoundingClientRect()
+
+        // Coordinates relative to the rows container's top-left
+        const x1 = fromRect.right  - containerRect.left
+        const y1 = fromRect.top    + fromRect.height / 2 - containerRect.top
+        const x2 = toRect.left     - containerRect.left
+        const y2 = toRect.top      + toRect.height  / 2 - containerRect.top
+
+        const dx  = Math.max(40, Math.abs(x2 - x1))
+        const cx1 = x1 + dx / 2
+        const cx2 = x2 - dx / 2
+
+        paths.push({ key: `${depId}-${todo.id}`, d: `M ${x1} ${y1} C ${cx1} ${y1}, ${cx2} ${y2}, ${x2} ${y2}` })
+      })
+    })
+
+    setArrowData(paths)
+  }, [scheduledTodos, measureTick])
 
   const prioritizeText: Record<string, string> = {
     low: 'Low', medium: 'Medium', high: 'High'
@@ -156,8 +203,8 @@ export default function GanttPage({ onNavigate }: GanttPageProps) {
           <div className="overflow-x-auto">
             <div style={{ minWidth: `${Math.max(800, periods.length * 80)}px` }}>
               {/* Timeline header */}
-              <div className="flex border-b border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/50 sticky top-0 z-10">
-                <div className="w-52 shrink-0 border-r border-gray-200 dark:border-gray-700 px-4 py-2 text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+              <div className="flex border-b border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/50 sticky top-0 z-20 h-[33px]">
+                <div className="w-52 shrink-0 border-r border-gray-200 dark:border-gray-700 px-4 py-2 text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider flex items-center">
                   Task
                 </div>
                 <div className="flex-1 relative">
@@ -165,7 +212,7 @@ export default function GanttPage({ onNavigate }: GanttPageProps) {
                     {periods.map((p, i) => (
                       <div
                         key={i}
-                        className="flex-1 px-1 py-2 text-xs font-medium text-gray-500 dark:text-gray-400 text-center border-r border-gray-100 dark:border-gray-700/50 last:border-r-0"
+                        className="flex-1 px-1 py-1 flex items-center justify-center text-[10px] font-medium text-gray-500 dark:text-gray-400 border-r border-gray-100 dark:border-gray-700/50 last:border-r-0"
                       >
                         {formatPeriodLabel(p, scale)}
                       </div>
@@ -174,70 +221,104 @@ export default function GanttPage({ onNavigate }: GanttPageProps) {
                 </div>
               </div>
 
-              {/* Rows */}
-              {scheduledTodos.map(todo => {
-                const startDate = new Date(todo.start_date!)
-                startDate.setHours(0, 0, 0, 0)
-                const start = toPercent(startDate)
-
-                const endDate = new Date(todo.end_date!)
-                endDate.setHours(23, 59, 59, 999)
-                const end = toPercent(endDate)
-
-                const width = Math.max(0.5, end - start)
-                const colors = STATUS_COLORS[todo.status]
-
-                return (
-                  <div
-                    key={todo.id}
-                    className="flex border-b border-gray-100 dark:border-gray-700/50 hover:bg-gray-50/50 dark:hover:bg-gray-700/20 group"
+              {/* Rows Container */}
+              <div className="relative" ref={rowsContainerRef}>
+                {/* SVG Dependency Overlay — coordinates come from getBoundingClientRect */}
+                {svgDims.w > 0 && svgDims.h > 0 && (
+                  <svg
+                    style={{ position: 'absolute', top: 0, left: 0, width: svgDims.w, height: svgDims.h, pointerEvents: 'none', zIndex: 10, overflow: 'visible' }}
                   >
-                    {/* Task label */}
+                    <defs>
+                      <marker id="dep-arrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+                        <path d="M 0 2 L 10 5 L 0 8 z" fill="#9ca3af" />
+                      </marker>
+                    </defs>
+                    {arrowData.map(({ key, d }) => (
+                      <path
+                        key={key}
+                        d={d}
+                        fill="none"
+                        stroke="#9ca3af"
+                        strokeWidth="1.5"
+                        strokeDasharray="4 2"
+                        markerEnd="url(#dep-arrow)"
+                      />
+                    ))}
+                  </svg>
+                )}
+
+                {/* Task Rows */}
+                {scheduledTodos.map(todo => {
+                  const startDate = new Date(todo.start_date!)
+                  startDate.setHours(0, 0, 0, 0)
+                  const start = toPercent(startDate)
+
+                  const endDate = new Date(todo.end_date!)
+                  endDate.setHours(23, 59, 59, 999)
+                  const end = toPercent(endDate)
+
+                  const width = Math.max(0.5, end - start)
+                  const colors = STATUS_COLORS[todo.status]
+
+                  return (
                     <div
-                      className="w-52 shrink-0 border-r border-gray-200 dark:border-gray-700 px-4 py-3 cursor-pointer"
-                      onClick={() => onNavigate({ type: 'edit', id: todo.id })}
+                      key={todo.id}
+                      className="flex border-b border-gray-100 dark:border-gray-700/50 hover:bg-gray-50/50 dark:hover:bg-gray-700/20 group relative z-0"
+                      style={{ height: ROW_HEIGHT }}
                     >
-                      <p className={`text-sm font-medium truncate ${todo.status === 'done' ? 'line-through text-gray-400' : 'text-gray-800 dark:text-gray-100'}`}>
-                        {todo.title}
-                      </p>
-                      <Badge priority={todo.priority} className="mt-1 text-[10px]">
-                        {prioritizeText[todo.priority || 'medium']}
-                      </Badge>
-                    </div>
-
-                    {/* Bar area */}
-                    <div className="flex-1 relative py-3 px-1">
-                      {/* Period grid lines */}
-                      <div className="absolute inset-0 flex pointer-events-none">
-                        {periods.map((_, i) => (
-                          <div key={i} className="flex-1 border-r border-gray-100 dark:border-gray-700/30 last:border-r-0" />
-                        ))}
-                      </div>
-
-                      {/* Today line */}
-                      {todayPct > 0 && todayPct < 100 && (
-                        <div
-                          className="absolute top-0 bottom-0 w-px bg-red-500 z-10 pointer-events-none"
-                          style={{ left: `${todayPct}%` }}
-                        />
-                      )}
-
-                      {/* Gantt bar */}
+                      {/* Task label */}
                       <div
-                        className={`absolute top-1/2 -translate-y-1/2 h-7 rounded-md ${colors.bg} opacity-90 cursor-pointer hover:opacity-100 transition-opacity shadow-sm flex items-center px-2 overflow-hidden`}
-                        style={{ left: `${start}%`, width: `${width}%` }}
+                        className="w-52 shrink-0 border-r border-gray-200 dark:border-gray-700 px-4 py-2 cursor-pointer flex flex-col justify-center bg-white dark:bg-gray-800"
                         onClick={() => onNavigate({ type: 'edit', id: todo.id })}
-                        onMouseEnter={(e) => setTooltip({ todo, x: e.clientX, y: e.clientY })}
-                        onMouseLeave={() => setTooltip(null)}
                       >
-                        <span className="text-white text-[10px] font-semibold truncate whitespace-nowrap">
+                        <p className={`text-sm font-medium truncate ${todo.status === 'done' ? 'line-through text-gray-400' : 'text-gray-800 dark:text-gray-100'}`}>
                           {todo.title}
-                        </span>
+                        </p>
+                        <div>
+                          <Badge priority={todo.priority} className="mt-1 text-[10px]">
+                            {prioritizeText[todo.priority || 'medium']}
+                          </Badge>
+                        </div>
+                      </div>
+
+                      {/* Bar area */}
+                      <div className="flex-1 relative">
+                        {/* Period grid lines */}
+                        <div className="absolute inset-0 flex pointer-events-none">
+                          {periods.map((_, idx) => (
+                            <div key={idx} className="flex-1 border-r border-gray-100 dark:border-gray-700/30 last:border-r-0" />
+                          ))}
+                        </div>
+
+                        {/* Today line */}
+                        {todayPct > 0 && todayPct < 100 && (
+                          <div
+                            className="absolute top-0 bottom-0 w-px bg-red-500/50 z-10 pointer-events-none"
+                            style={{ left: `${todayPct}%` }}
+                          />
+                        )}
+
+                        {/* Gantt bar */}
+                        <div
+                          ref={el => {
+                            if (el) barRefs.current.set(todo.id, el)
+                            else barRefs.current.delete(todo.id)
+                          }}
+                          className={`absolute top-1/2 -translate-y-1/2 h-7 rounded-md ${colors.bg} opacity-90 cursor-pointer hover:opacity-100 transition-opacity shadow-sm flex items-center px-2 overflow-hidden z-20 hover:z-30`}
+                          style={{ left: `${start}%`, width: `${width}%` }}
+                          onClick={() => onNavigate({ type: 'edit', id: todo.id })}
+                          onMouseEnter={e => setTooltip({ todo, x: e.clientX, y: e.clientY })}
+                          onMouseLeave={() => setTooltip(null)}
+                        >
+                          <span className="text-white text-[10px] font-semibold truncate whitespace-nowrap">
+                            {todo.title}
+                          </span>
+                        </div>
                       </div>
                     </div>
-                  </div>
-                )
-              })}
+                  )
+                })}
+              </div>
             </div>
           </div>
         )}
