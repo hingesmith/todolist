@@ -1,8 +1,10 @@
 import { Todo } from '../types/todo'
+import { Memo } from '../types/memo'
 import { validateTodoList } from '../validation/schema'
 
 const STORAGE_KEY = 'todolist_data'
 const AI_SETTINGS_KEY = 'ai_settings'
+const MEMOS_KEY = 'memos_data'
 
 export type AiProvider = 'gemini' | 'local'
 
@@ -118,5 +120,39 @@ export const storage = {
     } catch (e) {
       console.error('Failed to save AI settings', e)
     }
+  },
+
+  getMemos: (): Memo[] => {
+    try {
+      const data = localStorage.getItem(MEMOS_KEY)
+      if (!data) return []
+      return JSON.parse(data) as Memo[]
+    } catch {
+      return []
+    }
+  },
+
+  saveMemos: (memos: Memo[]): void => {
+    try {
+      localStorage.setItem(MEMOS_KEY, JSON.stringify(memos))
+    } catch (e) {
+      console.error('Failed to save memos', e)
+    }
+  },
+
+  getMemo: (id: string): Memo | undefined => {
+    return storage.getMemos().find(m => m.id === id)
+  },
+
+  addMemo: (memo: Memo): void => {
+    storage.saveMemos([...storage.getMemos(), memo])
+  },
+
+  updateMemo: (updated: Memo): void => {
+    storage.saveMemos(storage.getMemos().map(m => m.id === updated.id ? updated : m))
+  },
+
+  deleteMemo: (id: string): void => {
+    storage.saveMemos(storage.getMemos().filter(m => m.id !== id))
   }
 }

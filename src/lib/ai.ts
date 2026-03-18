@@ -162,6 +162,139 @@ async function generateWithLocalLLM(
   }
 }
 
+// ─── Daily report: template fallback (no AI required) ────────────────────────
+
+export function buildDailyReportTemplate(todos: Todo[], date: string): string {
+  const done       = todos.filter(t => t.status === 'done')
+  const inProgress = todos.filter(t => t.status === 'in_progress')
+  const todo       = todos.filter(t => t.status === 'todo')
+
+  const list = (items: Todo[]) =>
+    items.length ? items.map(t => `- ${t.title}`).join('\n') : '- なし'
+
+  return `# 日報 - ${date}
+
+## 完了したタスク
+${list(done)}
+
+## 進行中のタスク
+${list(inProgress)}
+
+## 未着手のタスク
+${list(todo)}
+
+## 所感・メモ
+
+（ここに記入してください）
+`
+}
+
+// ─── Daily report: AI-enhanced version ───────────────────────────────────────
+
+async function generateDailyReportWithGemini(
+  apiKey: string,
+  settings: AiSettings,
+  todos: Todo[],
+  date: string
+): Promise<string> {
+  const cleanKey = apiKey.trim().replace(/[^\x20-\x7E]/g, '')
+  const ai = new GoogleGenAI({ apiKey: cleanKey })
+
+  const systemInstruction = `あなたは業務日報作成のアシスタントです。与えられたタスク情報をもとに、Markdownフォーマットで整理された日報を生成してください。JSONやコードブロックは使わず、純粋なMarkdownテキストのみを返してください。`
+
+  const userMessage = `以下のタスク一覧から、${date}の日報をMarkdown形式で作成してください。完了・進行中・未着手に分類し、専門的で読みやすい日報にしてください。
+
+${JSON.stringify(todos, null, 2)}`
+
+  const response = await ai.models.generateContent({
+    model: settings.geminiModel,
+    contents: [{ role: 'user', parts: [{ text: userMessage }] }],
+    config: {
+      systemInstruction,
+      temperature: 0.3,
+    }
+  })
+
+  const text = response.text
+  if (!text) throw new Error('No text returned from Gemini API')
+  return text
+}
+
+async function generateDailyReportWithLocalLLM(
+  settings: AiSettings,
+  todos: Todo[],
+  date: string
+): Promise<string> {
+  if (!settings.localEndpoint) throw new Error('Local LLM Endpoint URL is not set.')
+
+  const headers: Record<string, string> = { 'Content-Type': 'application/json' }
+  if (settings.localApiKey?.trim()) {
+    headers['Authorization'] = `Bearer ${settings.localApiKey.trim()}`
+  }
+
+  const response = await fetch(settings.localEndpoint.trim(), {
+    method: 'POST',
+    headers,
+    body: JSON.stringify({
+      model: settings.localModel.trim(),
+      messages: [
+        {
+          role: 'system',
+          content: 'あなたは業務日報作成のアシスタントです。与えられたタスク情報をもとに、Markdownフォーマットで整理された日報を生成してください。JSONやコードブロックは使わず、純粋なMarkdownテキストのみを返してください。'
+        },
+        {
+          role: 'user',
+          content: `以下のタスク一覧から、${date}の日報をMarkdown形式で作成してください。完了・進行中・未着手に分類し、専門的で読みやすい日報にしてください。\n\n${JSON.stringify(todos, null, 2)}`
+        }
+      ],
+      temperature: 0.3,
+      stream: false
+    })
+  })
+
+  if (!response.ok) {
+    const errText = await response.text()
+    throw new Error(`Local LLM Error: ${response.status} ${errText}`)
+  }
+
+  const data = await response.json()
+  const text: string | undefined = data.choices?.[0]?.message?.content
+  if (!text) throw new Error('No response content from Local LLM')
+  return text.replace(/^```(?:markdown)?\s*/im, '').replace(/\s*```$/im, '').trim()
+}
+
+export async function generateDailyReportContent(
+  apiKey: string | null,
+  settings: AiSettings,
+  todos: Todo[],
+  date: string
+): Promise<string> {
+  if (settings.provider === 'gemini') {
+    if (!apiKey) throw new Error('Gemini API key is required but not set.')
+    return generateDailyReportWithGemini(apiKey, settings, todos, date)
+  } else {
+    return generateDailyReportWithLocalLLM(settings, todos, date)
+  }
+}
+
+// ─── Extract tasks from memo content ─────────────────────────────────────────
+
+export async function extractTasksFromMemo(
+  apiKey: string | null,
+  settings: AiSettings,
+  memoTitle: string,
+  memoContent: string,
+  currentTodos: Todo[]
+): Promise<AiOperationResponse> {
+  const messages: ChatMessage[] = [
+    {
+      role: 'user',
+      content: `以下のメモの内容からタスクを抽出・生成してください。\n\n# ${memoTitle}\n\n${memoContent}`
+    }
+  ]
+  return generateOperationsFromChat(apiKey, settings, messages, currentTodos)
+}
+
 // ─── Public entry point ───────────────────────────────────────────────────────
 
 export async function generateOperationsFromChat(

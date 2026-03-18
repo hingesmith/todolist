@@ -5,9 +5,12 @@ import EditPage from './pages/Edit'
 import BoardPage from './pages/Board'
 import GanttPage from './pages/Gantt'
 import SettingsPage from './pages/Settings'
+import MemoListPage from './pages/MemoList'
+import MemoEditPage from './pages/MemoEdit'
 import AiChatWidget from './components/AiChatWidget'
 import { storage } from './storage/local'
-import { LayoutList, Kanban, GanttChartSquare, Settings, Tag, X, Menu } from 'lucide-react'
+import { MemoType } from './types/memo'
+import { LayoutList, Kanban, GanttChartSquare, FileText, Settings, Tag, X, Menu } from 'lucide-react'
 
 export type PageState =
   | { type: 'list' }
@@ -16,11 +19,14 @@ export type PageState =
   | { type: 'settings' }
   | { type: 'create' }
   | { type: 'edit'; id: string }
+  | { type: 'memo' }
+  | { type: 'memo-edit'; id?: string; draft?: { title: string; content: string; type: MemoType } }
 
 const NAV_ITEMS = [
-  { type: 'list' as const,     icon: LayoutList,       desktopLabel: 'List View' },
-  { type: 'board' as const,    icon: Kanban,            desktopLabel: 'Board View' },
-  { type: 'gantt' as const,    icon: GanttChartSquare, desktopLabel: 'Gantt View' },
+  { type: 'list' as const,  icon: LayoutList,       desktopLabel: 'List View' },
+  { type: 'board' as const, icon: Kanban,            desktopLabel: 'Board View' },
+  { type: 'gantt' as const, icon: GanttChartSquare, desktopLabel: 'Gantt View' },
+  { type: 'memo' as const,  icon: FileText,          desktopLabel: 'Memo' },
 ]
 
 interface SidebarContentProps {
@@ -41,7 +47,7 @@ function SidebarContent({ page, allTags, selectedTag, onNavigate, onTagSelect }:
             key={type}
             onClick={() => onNavigate({ type })}
             className={`flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-medium transition-all ${
-              page.type === type && selectedTag === null
+              (page.type === type || (type === 'memo' && page.type === 'memo-edit')) && selectedTag === null
                 ? 'bg-blue-50 text-blue-700 dark:bg-blue-900/50 dark:text-blue-200'
                 : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900 dark:text-gray-300 dark:hover:bg-gray-700 dark:hover:text-white'
             }`}
@@ -212,12 +218,14 @@ function App() {
 
         <main className="flex-1 overflow-y-auto overflow-x-hidden p-4 sm:p-8 transition-all duration-300">
           <div className="mx-auto w-full min-w-0">
-            {page.type === 'list'     && <ListPage onNavigate={navigateTo} selectedTag={selectedTag} onTagSelect={handleTagSelect} />}
-            {page.type === 'board'    && <BoardPage onNavigate={navigateTo} />}
-            {page.type === 'gantt'    && <GanttPage onNavigate={navigateTo} />}
-            {page.type === 'settings' && <SettingsPage />}
-            {page.type === 'create'   && <CreatePage onNavigate={navigateTo} />}
-            {page.type === 'edit'     && <EditPage id={page.id} onNavigate={navigateTo} />}
+            {page.type === 'list'      && <ListPage onNavigate={navigateTo} selectedTag={selectedTag} onTagSelect={handleTagSelect} />}
+            {page.type === 'board'     && <BoardPage onNavigate={navigateTo} />}
+            {page.type === 'gantt'     && <GanttPage onNavigate={navigateTo} />}
+            {page.type === 'settings'  && <SettingsPage />}
+            {page.type === 'create'    && <CreatePage onNavigate={navigateTo} />}
+            {page.type === 'edit'      && <EditPage id={page.id} onNavigate={navigateTo} />}
+            {page.type === 'memo'      && <MemoListPage onNavigate={navigateTo} />}
+            {page.type === 'memo-edit' && <MemoEditPage id={page.id} draft={page.draft} onNavigate={navigateTo} />}
           </div>
         </main>
 
