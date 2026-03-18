@@ -11,9 +11,10 @@ import { validateTodo, getValidationErrors } from '../validation/schema'
 interface EditPageProps {
   id: string
   onNavigate: (page: PageState) => void
+  onBack: () => void
 }
 
-export default function EditPage({ id, onNavigate }: EditPageProps) {
+export default function EditPage({ id, onNavigate, onBack }: EditPageProps) {
   const [formData, setFormData] = useState<Partial<Todo> | null>(null)
   const [tagInput, setTagInput] = useState('')
   const [depInput, setDepInput] = useState('')
@@ -53,7 +54,7 @@ export default function EditPage({ id, onNavigate }: EditPageProps) {
     return (
       <div className="text-center py-12">
         <h2 className="text-2xl font-bold text-gray-900 dark:text-gray-100">Task not found</h2>
-        <Button className="mt-4" onClick={() => onNavigate({ type: 'list' })}>
+        <Button className="mt-4" onClick={onBack}>
           Back to List
         </Button>
       </div>
@@ -369,7 +370,7 @@ export default function EditPage({ id, onNavigate }: EditPageProps) {
         </div>
 
         <div className="pt-6 flex justify-end gap-3 border-t border-gray-200 dark:border-gray-700">
-          <Button type="button" variant="ghost" onClick={() => onNavigate({ type: 'list' })}>
+          <Button type="button" variant="ghost" onClick={onBack}>
             Cancel
           </Button>
           <Button type="submit">

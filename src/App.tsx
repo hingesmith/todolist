@@ -199,6 +199,7 @@ function SidebarContent({ page, allTags, selectedTags, allAssignees, selectedAss
 
 function App() {
   const [page, setPage] = useState<PageState>({ type: 'list' })
+  const [prevPage, setPrevPage] = useState<PageState>({ type: 'list' })
   const [selectedTags, setSelectedTags] = useState<string[]>([])
   const [allTags, setAllTags] = useState<string[]>([])
   const [selectedAssignees, setSelectedAssignees] = useState<string[]>([])
@@ -218,6 +219,7 @@ function App() {
   }, [page])
 
   const navigateTo = (newPage: PageState) => {
+    if (newPage.type === 'edit') setPrevPage(page)
     setPage(newPage)
     setMobileNavOpen(false)
   }
@@ -358,7 +360,7 @@ function App() {
             {page.type === 'gantt'     && <GanttPage onNavigate={navigateTo} />}
             {page.type === 'settings'  && <SettingsPage />}
             {page.type === 'create'    && <CreatePage onNavigate={navigateTo} />}
-            {page.type === 'edit'      && <EditPage id={page.id} onNavigate={navigateTo} />}
+            {page.type === 'edit'      && <EditPage id={page.id} onNavigate={navigateTo} onBack={() => navigateTo(prevPage)} />}
             {page.type === 'memo'      && <MemoListPage onNavigate={navigateTo} />}
             {page.type === 'memo-edit' && <MemoEditPage id={page.id} draft={page.draft} onNavigate={navigateTo} />}
           </div>
