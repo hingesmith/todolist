@@ -330,10 +330,18 @@ export default function GanttPage({ onNavigate, selectedTags, onTagSelect, onTag
 
   const prioritizeText: Record<string, string> = { low: 'Low', medium: 'Medium', high: 'High' }
 
-  const handleWheel = React.useCallback((e: React.WheelEvent) => {
-    if (!e.ctrlKey && !e.metaKey) return
-    e.preventDefault()
-    zoom(e.deltaY < 0 ? 1.15 : 0.87)
+  const scrollContainerRef = React.useRef<HTMLDivElement | null>(null)
+
+  React.useEffect(() => {
+    const el = scrollContainerRef.current
+    if (!el) return
+    const onWheel = (e: WheelEvent) => {
+      if (!e.ctrlKey && !e.metaKey) return
+      e.preventDefault()
+      zoom(e.deltaY < 0 ? 1.15 : 0.87)
+    }
+    el.addEventListener('wheel', onWheel, { passive: false })
+    return () => el.removeEventListener('wheel', onWheel)
   }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
   // Pinch-to-zoom
@@ -414,7 +422,7 @@ export default function GanttPage({ onNavigate, selectedTags, onTagSelect, onTag
         ) : (
           <div
             className="overflow-x-auto"
-            onWheel={handleWheel}
+            ref={scrollContainerRef}
             onTouchStart={handleChartTouchStart}
             onTouchMove={handleChartTouchMove}
             onTouchEnd={handleChartTouchEnd}
