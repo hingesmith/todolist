@@ -151,6 +151,7 @@ export default function GanttPage({ onNavigate }: GanttPageProps) {
 
   // Drag state
   const dragRef      = React.useRef<DragState | null>(null)
+  const didDragMoveRef = React.useRef(false)
   const liveTodosRef = React.useRef<Todo[]>([])
   const [liveTodos, setLiveTodosState] = React.useState<Todo[] | null>(null)
   const setLiveTodos = (t: Todo[] | null) => { liveTodosRef.current = t ?? []; setLiveTodosState(t) }
@@ -249,6 +250,7 @@ export default function GanttPage({ onNavigate }: GanttPageProps) {
       if (!dragRef.current) return
       e.preventDefault()
       dragRef.current.hasMoved = true
+      didDragMoveRef.current = true
       const clientX = 'touches' in e ? e.touches[0].clientX : e.clientX
       const next = computeDragResult(liveTodosRef.current, dragRef.current, clientX)
       setLiveTodos(next)
@@ -428,7 +430,8 @@ export default function GanttPage({ onNavigate }: GanttPageProps) {
                       <div
                         className="w-52 shrink-0 border-r border-gray-200 dark:border-gray-700 px-4 py-2 cursor-pointer flex flex-col justify-center bg-white dark:bg-gray-800"
                         onClick={() => {
-                          if (!dragRef.current?.hasMoved) onNavigate({ type: 'edit', id: todo.id })
+                          if (!didDragMoveRef.current) onNavigate({ type: 'edit', id: todo.id })
+                          didDragMoveRef.current = false
                         }}
                       >
                         <p className={`text-sm font-medium truncate ${todo.status === 'done' ? 'line-through text-gray-400' : 'text-gray-800 dark:text-gray-100'}`}>
@@ -463,7 +466,8 @@ export default function GanttPage({ onNavigate }: GanttPageProps) {
                           onMouseDown={e => handleDragStart(e, todo.id, 'move')}
                           onTouchStart={e => handleDragStart(e, todo.id, 'move')}
                           onClick={() => {
-                            if (!dragRef.current?.hasMoved) onNavigate({ type: 'edit', id: todo.id })
+                            if (!didDragMoveRef.current) onNavigate({ type: 'edit', id: todo.id })
+                            didDragMoveRef.current = false
                           }}
                           onMouseEnter={e => { if (!dragRef.current) setTooltip({ todo, x: e.clientX, y: e.clientY }) }}
                           onMouseLeave={() => setTooltip(null)}
