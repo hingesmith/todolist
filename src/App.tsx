@@ -10,7 +10,7 @@ import MemoEditPage from './pages/MemoEdit'
 import AiChatWidget from './components/AiChatWidget'
 import { storage } from './storage/local'
 import { MemoType } from './types/memo'
-import { LayoutList, Kanban, GanttChartSquare, FileText, CheckSquare, Settings, Tag, X, Menu } from 'lucide-react'
+import { LayoutList, Kanban, GanttChartSquare, FileText, CheckSquare, Settings, Tag, X, Menu, User } from 'lucide-react'
 
 export type PageState =
   | { type: 'list' }
@@ -62,12 +62,16 @@ interface SidebarContentProps {
   page: PageState
   allTags: string[]
   selectedTags: string[]
+  allAssignees: string[]
+  selectedAssignees: string[]
   onNavigate: (page: PageState) => void
   onTagSelect: (tag: string) => void
   onTagClear: () => void
+  onAssigneeSelect: (assignee: string) => void
+  onAssigneeClear: () => void
 }
 
-function SidebarContent({ page, allTags, selectedTags, onNavigate, onTagSelect, onTagClear }: SidebarContentProps) {
+function SidebarContent({ page, allTags, selectedTags, allAssignees, selectedAssignees, onNavigate, onTagSelect, onTagClear, onAssigneeSelect, onAssigneeClear }: SidebarContentProps) {
   return (
     <>
       {/* Main nav */}
@@ -92,45 +96,88 @@ function SidebarContent({ page, allTags, selectedTags, onNavigate, onTagSelect, 
         ))}
       </div>
 
-      {/* Tag filter section */}
-      {allTags.length > 0 && (
-        <div className="flex-1 flex flex-col min-h-0 mt-4 px-4">
-          <div className="flex items-center justify-between mb-2 px-1 shrink-0">
-            <span className="text-xs font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-wider">
-              Tags
-            </span>
-            {selectedTags.length > 0 && (
-              <button
-                onClick={onTagClear}
-                className="text-xs text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 flex items-center gap-0.5"
-              >
-                <X size={11} /> Clear
-              </button>
-            )}
-          </div>
-          <div className="overflow-y-auto flex flex-col gap-1 pb-2">
-            {allTags.map(tag => {
-              const active = selectedTags.includes(tag)
-              return (
-              <button
-                key={tag}
-                onClick={() => onTagSelect(tag)}
-                className={`flex items-center gap-2 px-3 py-2 rounded-lg text-sm transition-all text-left w-full ${
-                  active
-                    ? 'bg-indigo-50 text-indigo-700 dark:bg-indigo-900/50 dark:text-indigo-300 font-medium'
-                    : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900 dark:text-gray-300 dark:hover:bg-gray-700 dark:hover:text-white'
-                }`}
-              >
-                <Tag size={14} className="shrink-0" />
-                <span className="truncate">{tag}</span>
-                {active && <X size={12} className="ml-auto shrink-0 opacity-60" />}
-              </button>
-            )})}
-          </div>
-        </div>
-      )}
+      {/* Filter sections */}
+      {(allTags.length > 0 || allAssignees.length > 0) ? (
+        <div className="flex-1 flex flex-col min-h-0 mt-4 px-4 overflow-y-auto gap-4">
+          {allTags.length > 0 && (
+            <div className="flex flex-col min-h-0">
+              <div className="flex items-center justify-between mb-2 px-1 shrink-0">
+                <span className="text-xs font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-wider">
+                  Tags
+                </span>
+                {selectedTags.length > 0 && (
+                  <button
+                    onClick={onTagClear}
+                    className="text-xs text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 flex items-center gap-0.5"
+                  >
+                    <X size={11} /> Clear
+                  </button>
+                )}
+              </div>
+              <div className="flex flex-col gap-1 pb-2">
+                {allTags.map(tag => {
+                  const active = selectedTags.includes(tag)
+                  return (
+                    <button
+                      key={tag}
+                      onClick={() => onTagSelect(tag)}
+                      className={`flex items-center gap-2 px-3 py-2 rounded-lg text-sm transition-all text-left w-full ${
+                        active
+                          ? 'bg-indigo-50 text-indigo-700 dark:bg-indigo-900/50 dark:text-indigo-300 font-medium'
+                          : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900 dark:text-gray-300 dark:hover:bg-gray-700 dark:hover:text-white'
+                      }`}
+                    >
+                      <Tag size={14} className="shrink-0" />
+                      <span className="truncate">{tag}</span>
+                      {active && <X size={12} className="ml-auto shrink-0 opacity-60" />}
+                    </button>
+                  )
+                })}
+              </div>
+            </div>
+          )}
 
-      {!allTags.length && <div className="flex-1" />}
+          {allAssignees.length > 0 && (
+            <div className="flex flex-col min-h-0">
+              <div className="flex items-center justify-between mb-2 px-1 shrink-0">
+                <span className="text-xs font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-wider">
+                  Assignees
+                </span>
+                {selectedAssignees.length > 0 && (
+                  <button
+                    onClick={onAssigneeClear}
+                    className="text-xs text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 flex items-center gap-0.5"
+                  >
+                    <X size={11} /> Clear
+                  </button>
+                )}
+              </div>
+              <div className="flex flex-col gap-1 pb-2">
+                {allAssignees.map(assignee => {
+                  const active = selectedAssignees.includes(assignee)
+                  return (
+                    <button
+                      key={assignee}
+                      onClick={() => onAssigneeSelect(assignee)}
+                      className={`flex items-center gap-2 px-3 py-2 rounded-lg text-sm transition-all text-left w-full ${
+                        active
+                          ? 'bg-indigo-50 text-indigo-700 dark:bg-indigo-900/50 dark:text-indigo-300 font-medium'
+                          : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900 dark:text-gray-300 dark:hover:bg-gray-700 dark:hover:text-white'
+                      }`}
+                    >
+                      <User size={14} className="shrink-0" />
+                      <span className="truncate">{assignee}</span>
+                      {active && <X size={12} className="ml-auto shrink-0 opacity-60" />}
+                    </button>
+                  )
+                })}
+              </div>
+            </div>
+          )}
+        </div>
+      ) : (
+        <div className="flex-1" />
+      )}
 
       {/* Settings */}
       <div className="p-4 border-t border-gray-100 dark:border-gray-700 shrink-0">
@@ -154,13 +201,20 @@ function App() {
   const [page, setPage] = useState<PageState>({ type: 'list' })
   const [selectedTags, setSelectedTags] = useState<string[]>([])
   const [allTags, setAllTags] = useState<string[]>([])
+  const [selectedAssignees, setSelectedAssignees] = useState<string[]>([])
+  const [allAssignees, setAllAssignees] = useState<string[]>([])
   const [mobileNavOpen, setMobileNavOpen] = useState(false)
 
   useEffect(() => {
     const todos = storage.getTodos()
     const tagSet = new Set<string>()
-    todos.forEach(t => t.tags?.forEach(tag => tagSet.add(tag)))
+    const assigneeSet = new Set<string>()
+    todos.forEach(t => {
+      t.tags?.forEach(tag => tagSet.add(tag))
+      t.assignees?.forEach(a => assigneeSet.add(a))
+    })
     setAllTags(Array.from(tagSet).sort())
+    setAllAssignees(Array.from(assigneeSet).sort())
   }, [page])
 
   const navigateTo = (newPage: PageState) => {
@@ -176,6 +230,17 @@ function App() {
 
   const handleTagClear = () => {
     setSelectedTags([])
+    setMobileNavOpen(false)
+  }
+
+  const handleAssigneeSelect = (assignee: string) => {
+    setSelectedAssignees(prev => prev.includes(assignee) ? prev.filter(a => a !== assignee) : [...prev, assignee])
+    if (!(TASK_VIEWS as readonly string[]).includes(page.type)) navigateTo({ type: 'list' })
+    else setMobileNavOpen(false)
+  }
+
+  const handleAssigneeClear = () => {
+    setSelectedAssignees([])
     setMobileNavOpen(false)
   }
 
@@ -196,9 +261,13 @@ function App() {
           page={page}
           allTags={allTags}
           selectedTags={selectedTags}
+          allAssignees={allAssignees}
+          selectedAssignees={selectedAssignees}
           onNavigate={navigateTo}
           onTagSelect={handleTagSelect}
           onTagClear={handleTagClear}
+          onAssigneeSelect={handleAssigneeSelect}
+          onAssigneeClear={handleAssigneeClear}
         />
       </nav>
 
@@ -222,9 +291,13 @@ function App() {
               page={page}
               allTags={allTags}
               selectedTags={selectedTags}
+              allAssignees={allAssignees}
+              selectedAssignees={selectedAssignees}
               onNavigate={navigateTo}
               onTagSelect={handleTagSelect}
               onTagClear={handleTagClear}
+              onAssigneeSelect={handleAssigneeSelect}
+              onAssigneeClear={handleAssigneeClear}
             />
           </div>
           {/* Backdrop */}
@@ -260,6 +333,15 @@ function App() {
               <button onClick={handleTagClear} className="ml-0.5"><X size={11} /></button>
             </span>
           )}
+          {!(TASK_VIEWS as readonly string[]).includes(page.type) && selectedAssignees.length > 0 && (
+            <span className="flex items-center gap-1 bg-indigo-100 text-indigo-700 dark:bg-indigo-900/40 dark:text-indigo-300 text-xs font-medium px-2.5 py-1 rounded-full shrink-0">
+              <User size={11} />
+              <span className="max-w-[80px] truncate">
+                {selectedAssignees.length === 1 ? selectedAssignees[0] : `${selectedAssignees.length} people`}
+              </span>
+              <button onClick={handleAssigneeClear} className="ml-0.5"><X size={11} /></button>
+            </span>
+          )}
         </header>
 
         {/* View switcher bar – only on task pages, desktop */}
@@ -271,8 +353,8 @@ function App() {
 
         <main className="flex-1 overflow-y-auto overflow-x-hidden p-4 sm:p-8 transition-all duration-300">
           <div className="mx-auto w-full min-w-0">
-            {page.type === 'list'      && <ListPage onNavigate={navigateTo} selectedTags={selectedTags} onTagSelect={handleTagSelect} onTagClear={handleTagClear} />}
-            {page.type === 'board'     && <BoardPage onNavigate={navigateTo} selectedTags={selectedTags} onTagSelect={handleTagSelect} onTagClear={handleTagClear} />}
+            {page.type === 'list'      && <ListPage onNavigate={navigateTo} selectedTags={selectedTags} onTagSelect={handleTagSelect} onTagClear={handleTagClear} selectedAssignees={selectedAssignees} onAssigneeSelect={handleAssigneeSelect} onAssigneeClear={handleAssigneeClear} />}
+            {page.type === 'board'     && <BoardPage onNavigate={navigateTo} selectedTags={selectedTags} onTagSelect={handleTagSelect} onTagClear={handleTagClear} selectedAssignees={selectedAssignees} onAssigneeSelect={handleAssigneeSelect} onAssigneeClear={handleAssigneeClear} />}
             {page.type === 'gantt'     && <GanttPage onNavigate={navigateTo} />}
             {page.type === 'settings'  && <SettingsPage />}
             {page.type === 'create'    && <CreatePage onNavigate={navigateTo} />}

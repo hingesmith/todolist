@@ -3,16 +3,19 @@ import { PageState } from '../App'
 import { Badge } from '../components/ui/Badge'
 import { storage } from '../storage/local'
 import { Todo, TodoStatus } from '../types/todo'
-import { Plus, Clock, User } from 'lucide-react'
+import { Plus, Clock, User, Tag, X } from 'lucide-react'
 
 interface BoardPageProps {
   onNavigate: (page: PageState) => void
   selectedTags: string[]
   onTagSelect: (tag: string) => void
   onTagClear: () => void
+  selectedAssignees: string[]
+  onAssigneeSelect: (assignee: string) => void
+  onAssigneeClear: () => void
 }
 
-export default function BoardPage({ onNavigate, selectedTags, onTagSelect }: BoardPageProps) {
+export default function BoardPage({ onNavigate, selectedTags, onTagSelect, onTagClear, selectedAssignees, onAssigneeSelect, onAssigneeClear }: BoardPageProps) {
   const [todos, setTodos] = React.useState<Todo[]>([])
   const [draggingId, setDraggingId] = React.useState<string | null>(null)
   const [dragOverColumn, setDragOverColumn] = React.useState<TodoStatus | null>(null)
@@ -33,10 +36,19 @@ export default function BoardPage({ onNavigate, selectedTags, onTagSelect }: Boa
     return Array.from(tagSet).sort()
   }, [todos])
 
+  const allAssignees = React.useMemo(() => {
+    const set = new Set<string>()
+    todos.forEach(t => t.assignees?.forEach(a => set.add(a)))
+    return Array.from(set).sort()
+  }, [todos])
+
   const filteredTodos = React.useMemo(() => {
-    if (selectedTags.length === 0) return todos
-    return todos.filter(t => selectedTags.some(tag => t.tags?.includes(tag)))
-  }, [todos, selectedTags])
+    return todos.filter(t => {
+      const tagMatch = selectedTags.length === 0 || selectedTags.some(tag => t.tags?.includes(tag))
+      const assigneeMatch = selectedAssignees.length === 0 || selectedAssignees.some(a => t.assignees?.includes(a))
+      return tagMatch && assigneeMatch
+    })
+  }, [todos, selectedTags, selectedAssignees])
 
   const getTodosByStatus = (status: TodoStatus) => {
     return filteredTodos
@@ -113,25 +125,58 @@ export default function BoardPage({ onNavigate, selectedTags, onTagSelect }: Boa
       <div className="flex flex-col gap-3">
         <h2 className="text-3xl font-bold tracking-tight text-gray-900 dark:text-gray-100">Board</h2>
 
-        {allTags.length > 0 && (
-          <div className="flex items-center gap-2 flex-wrap">
-            <span className="text-xs text-gray-500 dark:text-gray-400 font-medium">Filter:</span>
-            {allTags.map(tag => {
-              const active = selectedTags.includes(tag)
-              return (
-                <button
-                  key={tag}
-                  onClick={() => onTagSelect(tag)}
-                  className={`flex items-center gap-1 text-xs px-2.5 py-1 rounded-full border font-medium transition-all ${
-                    active
-                      ? 'bg-indigo-600 text-white border-indigo-600'
-                      : 'bg-white dark:bg-gray-800 text-gray-600 dark:text-gray-300 border-gray-300 dark:border-gray-600 hover:border-indigo-400 hover:text-indigo-600 dark:hover:text-indigo-400'
-                  }`}
-                >
-                  #{tag}
-                </button>
-              )
-            })}
+        {(allTags.length > 0 || allAssignees.length > 0) && (
+          <div className="flex flex-col gap-1.5">
+            {allTags.length > 0 && (
+              <div className="flex items-center gap-2 flex-wrap">
+                <span className="text-xs text-gray-500 dark:text-gray-400 font-medium flex items-center gap-1"><Tag size={11} />Tag:</span>
+                {allTags.map(tag => {
+                  const active = selectedTags.includes(tag)
+                  return (
+                    <button
+                      key={tag}
+                      onClick={() => onTagSelect(tag)}
+                      className={`flex items-center gap-1 text-xs px-2.5 py-1 rounded-full border font-medium transition-all ${
+                        active
+                          ? 'bg-indigo-600 text-white border-indigo-600'
+                          : 'bg-white dark:bg-gray-800 text-gray-600 dark:text-gray-300 border-gray-300 dark:border-gray-600 hover:border-indigo-400 hover:text-indigo-600 dark:hover:text-indigo-400'
+                      }`}
+                    >
+                      #{tag}
+                      {active && <X size={10} />}
+                    </button>
+                  )
+                })}
+                {selectedTags.length > 0 && (
+                  <button onClick={onTagClear} className="text-xs text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 underline">Clear</button>
+                )}
+              </div>
+            )}
+            {allAssignees.length > 0 && (
+              <div className="flex items-center gap-2 flex-wrap">
+                <span className="text-xs text-gray-500 dark:text-gray-400 font-medium flex items-center gap-1"><User size={11} />担当:</span>
+                {allAssignees.map(a => {
+                  const active = selectedAssignees.includes(a)
+                  return (
+                    <button
+                      key={a}
+                      onClick={() => onAssigneeSelect(a)}
+                      className={`flex items-center gap-1 text-xs px-2.5 py-1 rounded-full border font-medium transition-all ${
+                        active
+                          ? 'bg-indigo-600 text-white border-indigo-600'
+                          : 'bg-white dark:bg-gray-800 text-gray-600 dark:text-gray-300 border-gray-300 dark:border-gray-600 hover:border-indigo-400 hover:text-indigo-600 dark:hover:text-indigo-400'
+                      }`}
+                    >
+                      {a}
+                      {active && <X size={10} />}
+                    </button>
+                  )
+                })}
+                {selectedAssignees.length > 0 && (
+                  <button onClick={onAssigneeClear} className="text-xs text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 underline">Clear</button>
+                )}
+              </div>
+            )}
           </div>
         )}
       </div>
@@ -212,9 +257,21 @@ export default function BoardPage({ onNavigate, selectedTags, onTagSelect }: Boa
                       </div>
                       
                       {todo.assignees && todo.assignees.length > 0 && (
-                        <div className="flex items-center gap-1 text-[10px] text-gray-500 dark:text-gray-400">
-                          <User size={10} />
-                          <span className="truncate">{todo.assignees.join(', ')}</span>
+                        <div className="flex items-center gap-1 flex-wrap text-[10px] text-gray-500 dark:text-gray-400">
+                          <User size={10} className="shrink-0" />
+                          {todo.assignees.map(a => (
+                            <span
+                              key={a}
+                              onClick={(e) => { e.stopPropagation(); onAssigneeSelect(a) }}
+                              className={`px-1.5 py-0.5 rounded cursor-pointer transition-colors ${
+                                selectedAssignees.includes(a)
+                                  ? 'bg-indigo-600 text-white'
+                                  : 'bg-gray-100 dark:bg-gray-700 hover:bg-indigo-100 hover:text-indigo-700 dark:hover:bg-indigo-900/50 dark:hover:text-indigo-300'
+                              }`}
+                            >
+                              {a}
+                            </span>
+                          ))}
                         </div>
                       )}
                       {todo.tags && todo.tags.length > 0 && (

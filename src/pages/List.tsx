@@ -11,9 +11,12 @@ interface ListPageProps {
   selectedTags: string[]
   onTagSelect: (tag: string) => void
   onTagClear: () => void
+  selectedAssignees: string[]
+  onAssigneeSelect: (assignee: string) => void
+  onAssigneeClear: () => void
 }
 
-export default function ListPage({ onNavigate, selectedTags, onTagSelect, onTagClear }: ListPageProps) {
+export default function ListPage({ onNavigate, selectedTags, onTagSelect, onTagClear, selectedAssignees, onAssigneeSelect, onAssigneeClear }: ListPageProps) {
   const [todos, setTodos] = React.useState<Todo[]>([])
   const [sortBy, setSortBy] = React.useState<'created_desc' | 'due_asc' | 'priority_desc'>('created_desc')
   const [doneOpen, setDoneOpen] = React.useState(false)
@@ -28,10 +31,18 @@ export default function ListPage({ onNavigate, selectedTags, onTagSelect, onTagC
     return Array.from(tagSet).sort()
   }, [todos])
 
+  const allAssignees = React.useMemo(() => {
+    const set = new Set<string>()
+    todos.forEach(t => t.assignees?.forEach(a => set.add(a)))
+    return Array.from(set).sort()
+  }, [todos])
+
   const sorted = React.useMemo(() => {
-    const base = selectedTags.length > 0
-      ? todos.filter(t => selectedTags.some(tag => t.tags?.includes(tag)))
-      : todos
+    const base = todos.filter(t => {
+      const tagMatch = selectedTags.length === 0 || selectedTags.some(tag => t.tags?.includes(tag))
+      const assigneeMatch = selectedAssignees.length === 0 || selectedAssignees.some(a => t.assignees?.includes(a))
+      return tagMatch && assigneeMatch
+    })
     const list = [...base]
     switch (sortBy) {
       case 'due_asc':
@@ -47,7 +58,7 @@ export default function ListPage({ onNavigate, selectedTags, onTagSelect, onTagC
       default:
         return list.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
     }
-  }, [todos, sortBy, selectedTags])
+  }, [todos, sortBy, selectedTags, selectedAssignees])
 
   const activeTodos = sorted.filter(t => t.status !== 'done')
   const doneTodos   = sorted.filter(t => t.status === 'done')
@@ -147,9 +158,21 @@ export default function ListPage({ onNavigate, selectedTags, onTagSelect, onTagC
             </span>
           )}
           {todo.assignees && todo.assignees.length > 0 && (
-            <span className="flex items-center gap-1">
+            <span className="flex items-center gap-1 flex-wrap">
               <User size={12} />
-              <span className="truncate">{todo.assignees.join(', ')}</span>
+              {todo.assignees.map(a => (
+                <span
+                  key={a}
+                  onClick={(e) => { e.stopPropagation(); onAssigneeSelect(a) }}
+                  className={`px-1.5 py-0.5 rounded cursor-pointer transition-colors ${
+                    selectedAssignees.includes(a)
+                      ? 'bg-indigo-600 text-white'
+                      : 'bg-gray-100 dark:bg-gray-700 hover:bg-indigo-100 hover:text-indigo-700 dark:hover:bg-indigo-900/50 dark:hover:text-indigo-300'
+                  }`}
+                >
+                  {a}
+                </span>
+              ))}
             </span>
           )}
         </div>
@@ -173,6 +196,15 @@ export default function ListPage({ onNavigate, selectedTags, onTagSelect, onTagC
                 </button>
               </span>
             ))}
+            {selectedAssignees.map(a => (
+              <span key={a} className="flex items-center gap-1 bg-indigo-100 text-indigo-700 dark:bg-indigo-900/40 dark:text-indigo-300 text-sm font-medium px-2.5 py-0.5 rounded-full">
+                <User size={11} />
+                {a}
+                <button onClick={() => onAssigneeSelect(a)} className="ml-0.5 hover:text-indigo-900 dark:hover:text-indigo-100">
+                  <X size={11} />
+                </button>
+              </span>
+            ))}
           </div>
           <select
             className="h-10 rounded-md border border-gray-300 bg-white py-2 px-3 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 dark:bg-gray-800 dark:border-gray-700 dark:text-gray-100 dark:focus:ring-indigo-400"
@@ -185,31 +217,62 @@ export default function ListPage({ onNavigate, selectedTags, onTagSelect, onTagC
           </select>
         </div>
 
-        {/* Tag filter strip */}
-        {allTags.length > 0 && (
-          <div className="flex items-center gap-2 overflow-x-auto pb-1 -mx-1 px-1 sm:flex-wrap sm:overflow-visible">
-            <span className="text-xs text-gray-500 dark:text-gray-400 font-medium shrink-0">Filter:</span>
-            {allTags.map(tag => {
-              const active = selectedTags.includes(tag)
-              return (
-                <button
-                  key={tag}
-                  onClick={() => onTagSelect(tag)}
-                  className={`flex items-center gap-1 text-xs px-2.5 py-1 rounded-full border font-medium transition-all shrink-0 ${
-                    active
-                      ? 'bg-indigo-600 text-white border-indigo-600'
-                      : 'bg-white dark:bg-gray-800 text-gray-600 dark:text-gray-300 border-gray-300 dark:border-gray-600 hover:border-indigo-400 hover:text-indigo-600 dark:hover:text-indigo-400'
-                  }`}
-                >
-                  #{tag}
-                  {active && <X size={10} />}
-                </button>
-              )
-            })}
-            {selectedTags.length > 0 && (
-              <button onClick={onTagClear} className="text-xs text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 underline shrink-0">
-                Clear all
-              </button>
+        {/* Filter strip */}
+        {(allTags.length > 0 || allAssignees.length > 0) && (
+          <div className="flex flex-col gap-1.5">
+            {allTags.length > 0 && (
+              <div className="flex items-center gap-2 overflow-x-auto pb-1 -mx-1 px-1 sm:flex-wrap sm:overflow-visible">
+                <span className="text-xs text-gray-500 dark:text-gray-400 font-medium shrink-0 flex items-center gap-1"><Tag size={11} />Tag:</span>
+                {allTags.map(tag => {
+                  const active = selectedTags.includes(tag)
+                  return (
+                    <button
+                      key={tag}
+                      onClick={() => onTagSelect(tag)}
+                      className={`flex items-center gap-1 text-xs px-2.5 py-1 rounded-full border font-medium transition-all shrink-0 ${
+                        active
+                          ? 'bg-indigo-600 text-white border-indigo-600'
+                          : 'bg-white dark:bg-gray-800 text-gray-600 dark:text-gray-300 border-gray-300 dark:border-gray-600 hover:border-indigo-400 hover:text-indigo-600 dark:hover:text-indigo-400'
+                      }`}
+                    >
+                      #{tag}
+                      {active && <X size={10} />}
+                    </button>
+                  )
+                })}
+                {selectedTags.length > 0 && (
+                  <button onClick={onTagClear} className="text-xs text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 underline shrink-0">
+                    Clear
+                  </button>
+                )}
+              </div>
+            )}
+            {allAssignees.length > 0 && (
+              <div className="flex items-center gap-2 overflow-x-auto pb-1 -mx-1 px-1 sm:flex-wrap sm:overflow-visible">
+                <span className="text-xs text-gray-500 dark:text-gray-400 font-medium shrink-0 flex items-center gap-1"><User size={11} />担当:</span>
+                {allAssignees.map(a => {
+                  const active = selectedAssignees.includes(a)
+                  return (
+                    <button
+                      key={a}
+                      onClick={() => onAssigneeSelect(a)}
+                      className={`flex items-center gap-1 text-xs px-2.5 py-1 rounded-full border font-medium transition-all shrink-0 ${
+                        active
+                          ? 'bg-indigo-600 text-white border-indigo-600'
+                          : 'bg-white dark:bg-gray-800 text-gray-600 dark:text-gray-300 border-gray-300 dark:border-gray-600 hover:border-indigo-400 hover:text-indigo-600 dark:hover:text-indigo-400'
+                      }`}
+                    >
+                      {a}
+                      {active && <X size={10} />}
+                    </button>
+                  )
+                })}
+                {selectedAssignees.length > 0 && (
+                  <button onClick={onAssigneeClear} className="text-xs text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 underline shrink-0">
+                    Clear
+                  </button>
+                )}
+              </div>
             )}
           </div>
         )}
@@ -220,9 +283,9 @@ export default function ListPage({ onNavigate, selectedTags, onTagSelect, onTagC
         <div className="text-center py-12 bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 border-dashed">
           <h3 className="text-lg font-medium text-gray-900 dark:text-gray-100">No tasks found</h3>
           <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
-            {selectedTags.length > 0 ? `選択中のタグに一致するタスクはありません。` : '新しいタスクを作成しましょう。'}
+            {(selectedTags.length > 0 || selectedAssignees.length > 0) ? `選択中のフィルターに一致するタスクはありません。` : '新しいタスクを作成しましょう。'}
           </p>
-          {selectedTags.length === 0 && (
+          {selectedTags.length === 0 && selectedAssignees.length === 0 && (
             <Button onClick={() => onNavigate({ type: 'create' })} className="mt-4 gap-2">
               <Plus size={16} /> Create Task
             </Button>
