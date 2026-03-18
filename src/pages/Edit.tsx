@@ -17,12 +17,15 @@ export default function EditPage({ id, onNavigate }: EditPageProps) {
   const [formData, setFormData] = useState<Partial<Todo> | null>(null)
   const [tagInput, setTagInput] = useState('')
   const [depInput, setDepInput] = useState('')
+  const [assigneeInput, setAssigneeInput] = useState('')
   const [errors, setErrors] = useState<Record<string, string>>({})
   const [notFound, setNotFound] = useState(false)
   const [availableTodos, setAvailableTodos] = useState<Todo[]>([])
+  const [members, setMembers] = useState<string[]>([])
 
   useEffect(() => {
     setAvailableTodos(storage.getTodos())
+    setMembers(storage.getMembers())
     const todo = storage.getTodo(id)
     if (todo) {
       // Format datetime for datetime-local input
@@ -134,6 +137,12 @@ export default function EditPage({ id, onNavigate }: EditPageProps) {
 
     if (todo.dependencies?.length === 0) {
       delete todo.dependencies
+    }
+
+    if (todo.assignees?.length === 0) {
+      delete todo.assignees
+    } else if (todo.assignees) {
+      todo.assignees.forEach(a => storage.addMember(a))
     }
 
     const isValid = validateTodo(todo)
@@ -308,6 +317,53 @@ export default function EditPage({ id, onNavigate }: EditPageProps) {
                   </div>
                 )
               })}
+            </div>
+          )}
+        </div>
+
+        {/* Assignees */}
+        <div className="space-y-2">
+          <Label htmlFor="assignees">担当者</Label>
+          <div className="flex gap-2">
+            <div className="relative flex-1">
+              <Input
+                id="assignees"
+                list="members-list-edit"
+                value={assigneeInput}
+                onChange={e => setAssigneeInput(e.target.value)}
+                onKeyDown={e => {
+                  if (e.key !== 'Enter') return
+                  e.preventDefault()
+                  const v = assigneeInput.trim()
+                  if (v && !formData.assignees?.includes(v)) {
+                    setFormData(prev => ({ ...prev!, assignees: [...(prev!.assignees || []), v] }))
+                  }
+                  setAssigneeInput('')
+                }}
+                placeholder="名前を入力して Enter"
+              />
+              <datalist id="members-list-edit">
+                {members.filter(m => !formData.assignees?.includes(m)).map(m => (
+                  <option key={m} value={m} />
+                ))}
+              </datalist>
+            </div>
+            <Button type="button" variant="secondary" onClick={() => {
+              const v = assigneeInput.trim()
+              if (v && !formData.assignees?.includes(v)) {
+                setFormData(prev => ({ ...prev!, assignees: [...(prev!.assignees || []), v] }))
+              }
+              setAssigneeInput('')
+            }}>Add</Button>
+          </div>
+          {formData.assignees && formData.assignees.length > 0 && (
+            <div className="flex flex-wrap gap-2 mt-2">
+              {formData.assignees.map((a: string) => (
+                <span key={a} className="inline-flex items-center gap-1 bg-purple-50 text-purple-700 dark:bg-purple-900/30 dark:text-purple-300 px-2.5 py-1 rounded-full text-sm">
+                  {a}
+                  <button type="button" onClick={() => setFormData(prev => ({ ...prev!, assignees: prev!.assignees?.filter(x => x !== a) }))} className="hover:text-purple-900 dark:hover:text-purple-100">&times;</button>
+                </span>
+              ))}
             </div>
           )}
         </div>

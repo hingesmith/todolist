@@ -82,6 +82,13 @@
         },
         "uniqueItems": true,
         "description": "このタスクを開始する前に完了していなければならない前提タスクのID（UUID）リスト"
+      },
+      "assignees": {
+        "type": "array",
+        "items": {
+          "type": "string"
+        },
+        "description": "タスクの担当者リスト"
       }
     },
     "additionalProperties": false

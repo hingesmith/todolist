@@ -3,7 +3,7 @@ import { PageState } from '../App'
 import { Badge } from '../components/ui/Badge'
 import { storage } from '../storage/local'
 import { Todo, TodoStatus } from '../types/todo'
-import { Clock, CalendarDays, ZoomIn, ZoomOut } from 'lucide-react'
+import { Clock, CalendarDays } from 'lucide-react'
 
 interface GanttPageProps {
   onNavigate: (page: PageState) => void
@@ -322,6 +322,34 @@ export default function GanttPage({ onNavigate }: GanttPageProps) {
     zoom(e.deltaY < 0 ? 1.15 : 0.87)
   }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
+  // Pinch-to-zoom
+  const pinchRef = React.useRef<{ dist: number } | null>(null)
+
+  const getTouchDist = (e: React.TouchEvent) => {
+    const t0 = e.touches[0], t1 = e.touches[1]
+    return Math.hypot(t0.clientX - t1.clientX, t0.clientY - t1.clientY)
+  }
+
+  const handleChartTouchStart = React.useCallback((e: React.TouchEvent) => {
+    if (e.touches.length === 2) {
+      dragRef.current = null // cancel any bar drag
+      pinchRef.current = { dist: getTouchDist(e) }
+    }
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
+
+  const handleChartTouchMove = React.useCallback((e: React.TouchEvent) => {
+    if (e.touches.length !== 2 || !pinchRef.current) return
+    e.preventDefault()
+    const newDist = getTouchDist(e)
+    const factor = newDist / pinchRef.current.dist
+    pinchRef.current.dist = newDist
+    zoom(factor)
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
+
+  const handleChartTouchEnd = React.useCallback(() => {
+    pinchRef.current = null
+  }, [])
+
   const scaleLabel = scale === 'day' ? 'Days' : scale === 'week' ? 'Weeks' : 'Months'
 
   return (
@@ -329,30 +357,7 @@ export default function GanttPage({ onNavigate }: GanttPageProps) {
       {/* Header */}
       <div className="flex items-center justify-between gap-4">
         <h2 className="text-3xl font-bold tracking-tight text-gray-900 dark:text-gray-100">Gantt</h2>
-        <div className="flex items-center gap-2">
-          <span className="text-xs text-gray-400 dark:text-gray-500 hidden sm:inline">
-            Ctrl + scroll to zoom
-          </span>
-          <div className="flex items-center bg-gray-100 dark:bg-gray-700 rounded-lg p-1 gap-1">
-            <button
-              onClick={() => zoom(0.8)}
-              className="p-1.5 rounded-md text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 hover:bg-white dark:hover:bg-gray-600 transition-all"
-              title="Zoom out"
-            >
-              <ZoomOut size={15} />
-            </button>
-            <span className="text-xs font-medium text-gray-600 dark:text-gray-300 w-12 text-center select-none">
-              {scaleLabel}
-            </span>
-            <button
-              onClick={() => zoom(1.25)}
-              className="p-1.5 rounded-md text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 hover:bg-white dark:hover:bg-gray-600 transition-all"
-              title="Zoom in"
-            >
-              <ZoomIn size={15} />
-            </button>
-          </div>
-        </div>
+        <span className="text-sm text-gray-500 dark:text-gray-400 select-none">{scaleLabel}</span>
       </div>
 
       {/* Chart */}
@@ -364,7 +369,13 @@ export default function GanttPage({ onNavigate }: GanttPageProps) {
             <p className="text-sm mt-1">Add dates to your tasks to see them here.</p>
           </div>
         ) : (
-          <div className="overflow-x-auto" onWheel={handleWheel}>
+          <div
+            className="overflow-x-auto"
+            onWheel={handleWheel}
+            onTouchStart={handleChartTouchStart}
+            onTouchMove={handleChartTouchMove}
+            onTouchEnd={handleChartTouchEnd}
+          >
             <div style={{ minWidth: `${Math.max(600, SIDEBAR_WIDTH + periods.length * colWidth)}px` }}>
               {/* Timeline header */}
               <div className="flex border-b border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/50 sticky top-0 z-20 h-[33px]">

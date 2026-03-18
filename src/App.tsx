@@ -61,12 +61,13 @@ const NAV_ITEMS = [
 interface SidebarContentProps {
   page: PageState
   allTags: string[]
-  selectedTag: string | null
+  selectedTags: string[]
   onNavigate: (page: PageState) => void
-  onTagSelect: (tag: string | null) => void
+  onTagSelect: (tag: string) => void
+  onTagClear: () => void
 }
 
-function SidebarContent({ page, allTags, selectedTag, onNavigate, onTagSelect }: SidebarContentProps) {
+function SidebarContent({ page, allTags, selectedTags, onNavigate, onTagSelect, onTagClear }: SidebarContentProps) {
   return (
     <>
       {/* Main nav */}
@@ -77,9 +78,9 @@ function SidebarContent({ page, allTags, selectedTag, onNavigate, onTagSelect }:
             onClick={() => onNavigate({ type })}
             className={`flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-medium transition-all ${
               (
-                (type === 'list' && (TASK_VIEWS as readonly string[]).includes(page.type) && selectedTag === null) ||
+                (type === 'list' && (TASK_VIEWS as readonly string[]).includes(page.type) && selectedTags.length === 0) ||
                 (type === 'memo' && (page.type === 'memo' || page.type === 'memo-edit')) ||
-                (type !== 'list' && type !== 'memo' && page.type === type && selectedTag === null)
+                (type !== 'list' && type !== 'memo' && page.type === type && selectedTags.length === 0)
               )
                 ? 'bg-blue-50 text-blue-700 dark:bg-blue-900/50 dark:text-blue-200'
                 : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900 dark:text-gray-300 dark:hover:bg-gray-700 dark:hover:text-white'
@@ -98,9 +99,9 @@ function SidebarContent({ page, allTags, selectedTag, onNavigate, onTagSelect }:
             <span className="text-xs font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-wider">
               Tags
             </span>
-            {selectedTag && (
+            {selectedTags.length > 0 && (
               <button
-                onClick={() => onTagSelect(null)}
+                onClick={onTagClear}
                 className="text-xs text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 flex items-center gap-0.5"
               >
                 <X size={11} /> Clear
@@ -108,21 +109,23 @@ function SidebarContent({ page, allTags, selectedTag, onNavigate, onTagSelect }:
             )}
           </div>
           <div className="overflow-y-auto flex flex-col gap-1 pb-2">
-            {allTags.map(tag => (
+            {allTags.map(tag => {
+              const active = selectedTags.includes(tag)
+              return (
               <button
                 key={tag}
                 onClick={() => onTagSelect(tag)}
                 className={`flex items-center gap-2 px-3 py-2 rounded-lg text-sm transition-all text-left w-full ${
-                  selectedTag === tag
+                  active
                     ? 'bg-indigo-50 text-indigo-700 dark:bg-indigo-900/50 dark:text-indigo-300 font-medium'
                     : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900 dark:text-gray-300 dark:hover:bg-gray-700 dark:hover:text-white'
                 }`}
               >
                 <Tag size={14} className="shrink-0" />
                 <span className="truncate">{tag}</span>
-                {selectedTag === tag && <X size={12} className="ml-auto shrink-0 opacity-60" />}
+                {active && <X size={12} className="ml-auto shrink-0 opacity-60" />}
               </button>
-            ))}
+            )})}
           </div>
         </div>
       )}
@@ -149,7 +152,7 @@ function SidebarContent({ page, allTags, selectedTag, onNavigate, onTagSelect }:
 
 function App() {
   const [page, setPage] = useState<PageState>({ type: 'list' })
-  const [selectedTag, setSelectedTag] = useState<string | null>(null)
+  const [selectedTags, setSelectedTags] = useState<string[]>([])
   const [allTags, setAllTags] = useState<string[]>([])
   const [mobileNavOpen, setMobileNavOpen] = useState(false)
 
@@ -165,10 +168,15 @@ function App() {
     setMobileNavOpen(false)
   }
 
-  const handleTagSelect = (tag: string | null) => {
-    setSelectedTag(prev => prev === tag ? null : tag)
-    if (tag !== null) navigateTo({ type: 'list' })
+  const handleTagSelect = (tag: string) => {
+    setSelectedTags(prev => prev.includes(tag) ? prev.filter(t => t !== tag) : [...prev, tag])
+    if (!(TASK_VIEWS as readonly string[]).includes(page.type)) navigateTo({ type: 'list' })
     else setMobileNavOpen(false)
+  }
+
+  const handleTagClear = () => {
+    setSelectedTags([])
+    setMobileNavOpen(false)
   }
 
   return (
@@ -187,9 +195,10 @@ function App() {
         <SidebarContent
           page={page}
           allTags={allTags}
-          selectedTag={selectedTag}
+          selectedTags={selectedTags}
           onNavigate={navigateTo}
           onTagSelect={handleTagSelect}
+          onTagClear={handleTagClear}
         />
       </nav>
 
@@ -212,9 +221,10 @@ function App() {
             <SidebarContent
               page={page}
               allTags={allTags}
-              selectedTag={selectedTag}
+              selectedTags={selectedTags}
               onNavigate={navigateTo}
               onTagSelect={handleTagSelect}
+              onTagClear={handleTagClear}
             />
           </div>
           {/* Backdrop */}
@@ -241,11 +251,13 @@ function App() {
           {(TASK_VIEWS as readonly string[]).includes(page.type) && (
             <ViewSwitcher page={page} onNavigate={navigateTo} />
           )}
-          {!(TASK_VIEWS as readonly string[]).includes(page.type) && selectedTag && (
+          {!(TASK_VIEWS as readonly string[]).includes(page.type) && selectedTags.length > 0 && (
             <span className="flex items-center gap-1 bg-indigo-100 text-indigo-700 dark:bg-indigo-900/40 dark:text-indigo-300 text-xs font-medium px-2.5 py-1 rounded-full shrink-0">
               <Tag size={11} />
-              <span className="max-w-[80px] truncate">{selectedTag}</span>
-              <button onClick={() => setSelectedTag(null)} className="ml-0.5"><X size={11} /></button>
+              <span className="max-w-[80px] truncate">
+                {selectedTags.length === 1 ? selectedTags[0] : `${selectedTags.length} tags`}
+              </span>
+              <button onClick={handleTagClear} className="ml-0.5"><X size={11} /></button>
             </span>
           )}
         </header>
@@ -259,8 +271,8 @@ function App() {
 
         <main className="flex-1 overflow-y-auto overflow-x-hidden p-4 sm:p-8 transition-all duration-300">
           <div className="mx-auto w-full min-w-0">
-            {page.type === 'list'      && <ListPage onNavigate={navigateTo} selectedTag={selectedTag} onTagSelect={handleTagSelect} />}
-            {page.type === 'board'     && <BoardPage onNavigate={navigateTo} />}
+            {page.type === 'list'      && <ListPage onNavigate={navigateTo} selectedTags={selectedTags} onTagSelect={handleTagSelect} onTagClear={handleTagClear} />}
+            {page.type === 'board'     && <BoardPage onNavigate={navigateTo} selectedTags={selectedTags} onTagSelect={handleTagSelect} onTagClear={handleTagClear} />}
             {page.type === 'gantt'     && <GanttPage onNavigate={navigateTo} />}
             {page.type === 'settings'  && <SettingsPage />}
             {page.type === 'create'    && <CreatePage onNavigate={navigateTo} />}

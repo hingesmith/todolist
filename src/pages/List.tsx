@@ -4,15 +4,16 @@ import { Badge } from '../components/ui/Badge'
 import { Button } from '../components/ui/Button'
 import { storage } from '../storage/local'
 import { Todo } from '../types/todo'
-import { Plus, Clock, Tag, X, CheckCircle2, Circle, ChevronDown, ChevronRight } from 'lucide-react'
+import { Plus, Clock, Tag, X, CheckCircle2, Circle, ChevronDown, ChevronRight, User } from 'lucide-react'
 
 interface ListPageProps {
   onNavigate: (page: PageState) => void
-  selectedTag: string | null
-  onTagSelect: (tag: string | null) => void
+  selectedTags: string[]
+  onTagSelect: (tag: string) => void
+  onTagClear: () => void
 }
 
-export default function ListPage({ onNavigate, selectedTag, onTagSelect }: ListPageProps) {
+export default function ListPage({ onNavigate, selectedTags, onTagSelect, onTagClear }: ListPageProps) {
   const [todos, setTodos] = React.useState<Todo[]>([])
   const [sortBy, setSortBy] = React.useState<'created_desc' | 'due_asc' | 'priority_desc'>('created_desc')
   const [doneOpen, setDoneOpen] = React.useState(false)
@@ -28,7 +29,9 @@ export default function ListPage({ onNavigate, selectedTag, onTagSelect }: ListP
   }, [todos])
 
   const sorted = React.useMemo(() => {
-    const base = selectedTag ? todos.filter(t => t.tags?.includes(selectedTag)) : todos
+    const base = selectedTags.length > 0
+      ? todos.filter(t => selectedTags.some(tag => t.tags?.includes(tag)))
+      : todos
     const list = [...base]
     switch (sortBy) {
       case 'due_asc':
@@ -44,7 +47,7 @@ export default function ListPage({ onNavigate, selectedTag, onTagSelect }: ListP
       default:
         return list.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
     }
-  }, [todos, sortBy, selectedTag])
+  }, [todos, sortBy, selectedTags])
 
   const activeTodos = sorted.filter(t => t.status !== 'done')
   const doneTodos   = sorted.filter(t => t.status === 'done')
@@ -133,7 +136,7 @@ export default function ListPage({ onNavigate, selectedTag, onTagSelect }: ListP
                   key={tag}
                   onClick={(e) => handleTagClick(e, tag)}
                   className={`px-1.5 py-0.5 rounded cursor-pointer transition-colors ${
-                    selectedTag === tag
+                    selectedTags.includes(tag)
                       ? 'bg-indigo-600 text-white'
                       : 'bg-gray-100 dark:bg-gray-700 hover:bg-indigo-100 hover:text-indigo-700 dark:hover:bg-indigo-900/50 dark:hover:text-indigo-300'
                   }`}
@@ -141,6 +144,12 @@ export default function ListPage({ onNavigate, selectedTag, onTagSelect }: ListP
                   {tag}
                 </span>
               ))}
+            </span>
+          )}
+          {todo.assignees && todo.assignees.length > 0 && (
+            <span className="flex items-center gap-1">
+              <User size={12} />
+              <span className="truncate">{todo.assignees.join(', ')}</span>
             </span>
           )}
         </div>
@@ -153,17 +162,17 @@ export default function ListPage({ onNavigate, selectedTag, onTagSelect }: ListP
       {/* Header */}
       <div className="flex flex-col gap-3">
         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2 flex-wrap">
             <h2 className="text-3xl font-bold tracking-tight text-gray-900 dark:text-gray-100">Tasks</h2>
-            {selectedTag && (
-              <span className="flex items-center gap-1.5 bg-indigo-100 text-indigo-700 dark:bg-indigo-900/40 dark:text-indigo-300 text-sm font-medium px-3 py-1 rounded-full">
-                <Tag size={13} />
-                {selectedTag}
-                <button onClick={() => onTagSelect(null)} className="ml-0.5 hover:text-indigo-900 dark:hover:text-indigo-100">
-                  <X size={13} />
+            {selectedTags.map(tag => (
+              <span key={tag} className="flex items-center gap-1 bg-indigo-100 text-indigo-700 dark:bg-indigo-900/40 dark:text-indigo-300 text-sm font-medium px-2.5 py-0.5 rounded-full">
+                <Tag size={11} />
+                {tag}
+                <button onClick={() => onTagSelect(tag)} className="ml-0.5 hover:text-indigo-900 dark:hover:text-indigo-100">
+                  <X size={11} />
                 </button>
               </span>
-            )}
+            ))}
           </div>
           <select
             className="h-10 rounded-md border border-gray-300 bg-white py-2 px-3 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 dark:bg-gray-800 dark:border-gray-700 dark:text-gray-100 dark:focus:ring-indigo-400"
@@ -179,26 +188,27 @@ export default function ListPage({ onNavigate, selectedTag, onTagSelect }: ListP
         {/* Tag filter strip */}
         {allTags.length > 0 && (
           <div className="flex items-center gap-2 overflow-x-auto pb-1 -mx-1 px-1 sm:flex-wrap sm:overflow-visible">
-            <span className="text-xs text-gray-500 dark:text-gray-400 font-medium shrink-0">
-              {selectedTag ? 'Tag:' : 'Filter:'}
-            </span>
-            {allTags.map(tag => (
-              <button
-                key={tag}
-                onClick={() => onTagSelect(tag)}
-                className={`flex items-center gap-1 text-xs px-2.5 py-1 rounded-full border font-medium transition-all shrink-0 ${
-                  selectedTag === tag
-                    ? 'bg-indigo-600 text-white border-indigo-600'
-                    : 'bg-white dark:bg-gray-800 text-gray-600 dark:text-gray-300 border-gray-300 dark:border-gray-600 hover:border-indigo-400 hover:text-indigo-600 dark:hover:text-indigo-400'
-                }`}
-              >
-                #{tag}
-                {selectedTag === tag && <X size={10} />}
-              </button>
-            ))}
-            {selectedTag && (
-              <button onClick={() => onTagSelect(null)} className="text-xs text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 underline shrink-0">
-                Clear
+            <span className="text-xs text-gray-500 dark:text-gray-400 font-medium shrink-0">Filter:</span>
+            {allTags.map(tag => {
+              const active = selectedTags.includes(tag)
+              return (
+                <button
+                  key={tag}
+                  onClick={() => onTagSelect(tag)}
+                  className={`flex items-center gap-1 text-xs px-2.5 py-1 rounded-full border font-medium transition-all shrink-0 ${
+                    active
+                      ? 'bg-indigo-600 text-white border-indigo-600'
+                      : 'bg-white dark:bg-gray-800 text-gray-600 dark:text-gray-300 border-gray-300 dark:border-gray-600 hover:border-indigo-400 hover:text-indigo-600 dark:hover:text-indigo-400'
+                  }`}
+                >
+                  #{tag}
+                  {active && <X size={10} />}
+                </button>
+              )
+            })}
+            {selectedTags.length > 0 && (
+              <button onClick={onTagClear} className="text-xs text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 underline shrink-0">
+                Clear all
               </button>
             )}
           </div>
@@ -210,9 +220,9 @@ export default function ListPage({ onNavigate, selectedTag, onTagSelect }: ListP
         <div className="text-center py-12 bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 border-dashed">
           <h3 className="text-lg font-medium text-gray-900 dark:text-gray-100">No tasks found</h3>
           <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
-            {selectedTag ? `"${selectedTag}" のタスクはありません。` : '新しいタスクを作成しましょう。'}
+            {selectedTags.length > 0 ? `選択中のタグに一致するタスクはありません。` : '新しいタスクを作成しましょう。'}
           </p>
-          {!selectedTag && (
+          {selectedTags.length === 0 && (
             <Button onClick={() => onNavigate({ type: 'create' })} className="mt-4 gap-2">
               <Plus size={16} /> Create Task
             </Button>

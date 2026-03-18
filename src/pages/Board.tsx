@@ -3,15 +3,17 @@ import { PageState } from '../App'
 import { Badge } from '../components/ui/Badge'
 import { storage } from '../storage/local'
 import { Todo, TodoStatus } from '../types/todo'
-import { Plus, Clock, X } from 'lucide-react'
+import { Plus, Clock, User } from 'lucide-react'
 
 interface BoardPageProps {
   onNavigate: (page: PageState) => void
+  selectedTags: string[]
+  onTagSelect: (tag: string) => void
+  onTagClear: () => void
 }
 
-export default function BoardPage({ onNavigate }: BoardPageProps) {
+export default function BoardPage({ onNavigate, selectedTags, onTagSelect }: BoardPageProps) {
   const [todos, setTodos] = React.useState<Todo[]>([])
-  const [selectedTag, setSelectedTag] = React.useState<string | null>(null)
   const [draggingId, setDraggingId] = React.useState<string | null>(null)
   const [dragOverColumn, setDragOverColumn] = React.useState<TodoStatus | null>(null)
 
@@ -32,9 +34,9 @@ export default function BoardPage({ onNavigate }: BoardPageProps) {
   }, [todos])
 
   const filteredTodos = React.useMemo(() => {
-    if (!selectedTag) return todos
-    return todos.filter(t => t.tags?.includes(selectedTag))
-  }, [todos, selectedTag])
+    if (selectedTags.length === 0) return todos
+    return todos.filter(t => selectedTags.some(tag => t.tags?.includes(tag)))
+  }, [todos, selectedTags])
 
   const getTodosByStatus = (status: TodoStatus) => {
     return filteredTodos
@@ -58,7 +60,7 @@ export default function BoardPage({ onNavigate }: BoardPageProps) {
 
   const handleTagClick = (e: React.MouseEvent, tag: string) => {
     e.stopPropagation()
-    setSelectedTag(prev => prev === tag ? null : tag)
+    onTagSelect(tag)
   }
 
   // Drag and Drop Handlers
@@ -113,29 +115,23 @@ export default function BoardPage({ onNavigate }: BoardPageProps) {
 
         {allTags.length > 0 && (
           <div className="flex items-center gap-2 flex-wrap">
-            <span className="text-xs text-gray-500 dark:text-gray-400 font-medium">Filter by tag:</span>
-            {allTags.map(tag => (
-              <button
-                key={tag}
-                onClick={() => setSelectedTag(prev => prev === tag ? null : tag)}
-                className={`flex items-center gap-1 text-xs px-2.5 py-1 rounded-full border font-medium transition-all ${
-                  selectedTag === tag
-                    ? 'bg-indigo-600 text-white border-indigo-600'
-                    : 'bg-white dark:bg-gray-800 text-gray-600 dark:text-gray-300 border-gray-300 dark:border-gray-600 hover:border-indigo-400 hover:text-indigo-600 dark:hover:text-indigo-400'
-                }`}
-              >
-                #{tag}
-                {selectedTag === tag && <X size={10} />}
-              </button>
-            ))}
-            {selectedTag && (
-              <button
-                onClick={() => setSelectedTag(null)}
-                className="text-xs text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 underline"
-              >
-                Clear filter
-              </button>
-            )}
+            <span className="text-xs text-gray-500 dark:text-gray-400 font-medium">Filter:</span>
+            {allTags.map(tag => {
+              const active = selectedTags.includes(tag)
+              return (
+                <button
+                  key={tag}
+                  onClick={() => onTagSelect(tag)}
+                  className={`flex items-center gap-1 text-xs px-2.5 py-1 rounded-full border font-medium transition-all ${
+                    active
+                      ? 'bg-indigo-600 text-white border-indigo-600'
+                      : 'bg-white dark:bg-gray-800 text-gray-600 dark:text-gray-300 border-gray-300 dark:border-gray-600 hover:border-indigo-400 hover:text-indigo-600 dark:hover:text-indigo-400'
+                  }`}
+                >
+                  #{tag}
+                </button>
+              )
+            })}
           </div>
         )}
       </div>
@@ -169,7 +165,7 @@ export default function BoardPage({ onNavigate }: BoardPageProps) {
               <div className="flex flex-col gap-3 flex-1">
                 {columnTodos.length === 0 ? (
                   <div className="text-center py-8 text-sm text-gray-500 border-2 border-dashed border-gray-200 dark:border-gray-700 rounded-lg">
-                    {selectedTag ? `No "${selectedTag}" tasks` : 'No tasks'}
+                    {selectedTags.length > 0 ? 'No matching tasks' : 'No tasks'}
                   </div>
                 ) : (
                   columnTodos.map(todo => {
@@ -215,6 +211,12 @@ export default function BoardPage({ onNavigate }: BoardPageProps) {
                         )}
                       </div>
                       
+                      {todo.assignees && todo.assignees.length > 0 && (
+                        <div className="flex items-center gap-1 text-[10px] text-gray-500 dark:text-gray-400">
+                          <User size={10} />
+                          <span className="truncate">{todo.assignees.join(', ')}</span>
+                        </div>
+                      )}
                       {todo.tags && todo.tags.length > 0 && (
                         <div className="flex items-center gap-1 flex-wrap pt-1">
                           {todo.tags.map(tag => (
@@ -222,7 +224,7 @@ export default function BoardPage({ onNavigate }: BoardPageProps) {
                               key={tag}
                               onClick={(e) => handleTagClick(e, tag)}
                               className={`text-[10px] px-1.5 py-0.5 rounded cursor-pointer transition-colors ${
-                                selectedTag === tag
+                                selectedTags.includes(tag)
                                   ? 'bg-indigo-600 text-white'
                                   : 'bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 hover:bg-indigo-100 hover:text-indigo-700 dark:hover:bg-indigo-900/50 dark:hover:text-indigo-300'
                               }`}

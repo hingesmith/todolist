@@ -5,6 +5,7 @@ import { validateTodoList } from '../validation/schema'
 const STORAGE_KEY = 'todolist_data'
 const AI_SETTINGS_KEY = 'ai_settings'
 const MEMOS_KEY = 'memos_data'
+const MEMBERS_KEY = 'members_data'
 
 export type AiProvider = 'gemini' | 'local'
 
@@ -154,5 +155,25 @@ export const storage = {
 
   deleteMemo: (id: string): void => {
     storage.saveMemos(storage.getMemos().filter(m => m.id !== id))
+  },
+
+  getMembers: (): string[] => {
+    try {
+      const data = localStorage.getItem(MEMBERS_KEY)
+      return data ? JSON.parse(data) : []
+    } catch { return [] }
+  },
+
+  saveMembers: (members: string[]): void => {
+    try {
+      localStorage.setItem(MEMBERS_KEY, JSON.stringify([...new Set(members)].sort()))
+    } catch (e) { console.error('Failed to save members', e) }
+  },
+
+  addMember: (name: string): void => {
+    const trimmed = name.trim()
+    if (!trimmed) return
+    const members = storage.getMembers()
+    if (!members.includes(trimmed)) storage.saveMembers([...members, trimmed])
   }
 }

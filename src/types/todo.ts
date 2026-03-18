@@ -13,4 +13,5 @@ export interface Todo {
   start_date?: string
   tags?: string[]
   dependencies?: string[]
+  assignees?: string[]
 }
