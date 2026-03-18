@@ -55,7 +55,8 @@ export default function ListPage({ onNavigate, selectedTag, onTagSelect }: ListP
     e.stopPropagation()
     const todo = todos.find(t => t.id === id)
     if (!todo) return
-    storage.updateTodo({ ...todo, status: 'done', updated_at: new Date().toISOString() })
+    const newStatus = todo.status === 'done' ? 'todo' : 'done'
+    storage.updateTodo({ ...todo, status: newStatus, updated_at: new Date().toISOString() })
     setTodos(storage.getTodos())
   }
 
@@ -88,9 +89,9 @@ export default function ListPage({ onNavigate, selectedTag, onTagSelect }: ListP
             ? 'text-green-500 dark:text-green-400'
             : 'text-gray-300 hover:text-green-500 dark:text-gray-600 dark:hover:text-green-400'
         }`}
-        onClick={isDone ? undefined : (e) => handleComplete(todo.id, e)}
-        aria-label={isDone ? '完了済み' : '完了にする'}
-        style={{ cursor: isDone ? 'default' : 'pointer' }}
+        onClick={(e) => handleComplete(todo.id, e)}
+        aria-label={isDone ? '未完了に戻す' : '完了にする'}
+        style={{ cursor: 'pointer' }}
       >
         {isDone ? <CheckCircle2 size={22} /> : <Circle size={22} />}
       </button>
