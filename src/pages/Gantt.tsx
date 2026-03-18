@@ -3,7 +3,7 @@ import { PageState } from '../App'
 import { Badge } from '../components/ui/Badge'
 import { storage } from '../storage/local'
 import { Todo, TodoStatus } from '../types/todo'
-import { Clock, CalendarDays } from 'lucide-react'
+import { Clock, CalendarDays, ZoomIn, ZoomOut } from 'lucide-react'
 
 interface GanttPageProps {
   onNavigate: (page: PageState) => void
@@ -130,10 +130,24 @@ const STATUS_COLORS: Record<TodoStatus, string> = {
 
 // ─── component ───────────────────────────────────────────────────────────────
 
+// colWidth (px per period column) → scale
+function scaleFromColWidth(w: number): Scale {
+  if (w < 40) return 'month'
+  if (w < 90) return 'week'
+  return 'day'
+}
+
+const DEFAULT_COL_WIDTH = 60  // → week scale
+
 export default function GanttPage({ onNavigate }: GanttPageProps) {
-  const [todos, setTodos]   = React.useState<Todo[]>([])
-  const [scale, setScale]   = React.useState<Scale>('week')
-  const [tooltip, setTooltip] = React.useState<{ todo: Todo; x: number; y: number } | null>(null)
+  const [todos, setTodos]       = React.useState<Todo[]>([])
+  const [colWidth, setColWidth] = React.useState(DEFAULT_COL_WIDTH)
+  const [tooltip, setTooltip]   = React.useState<{ todo: Todo; x: number; y: number } | null>(null)
+
+  const scale = scaleFromColWidth(colWidth)
+
+  const zoom = (factor: number) =>
+    setColWidth(prev => Math.max(20, Math.min(250, Math.round(prev * factor))))
 
   // Drag state
   const dragRef      = React.useRef<DragState | null>(null)
@@ -302,23 +316,42 @@ export default function GanttPage({ onNavigate }: GanttPageProps) {
 
   const prioritizeText: Record<string, string> = { low: 'Low', medium: 'Medium', high: 'High' }
 
+  const handleWheel = React.useCallback((e: React.WheelEvent) => {
+    if (!e.ctrlKey && !e.metaKey) return
+    e.preventDefault()
+    zoom(e.deltaY < 0 ? 1.15 : 0.87)
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
+
+  const scaleLabel = scale === 'day' ? 'Days' : scale === 'week' ? 'Weeks' : 'Months'
+
   return (
     <div className="space-y-6 min-w-0">
       {/* Header */}
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+      <div className="flex items-center justify-between gap-4">
         <h2 className="text-3xl font-bold tracking-tight text-gray-900 dark:text-gray-100">Gantt</h2>
-        <div className="flex bg-gray-100 dark:bg-gray-700 p-1 rounded-lg text-sm font-medium">
-          {(['day', 'week', 'month'] as Scale[]).map(s => (
-            <button key={s} onClick={() => setScale(s)}
-              className={`px-3 py-1.5 rounded-md transition-all capitalize ${
-                scale === s
-                  ? 'bg-white dark:bg-gray-600 text-gray-900 dark:text-white shadow-sm'
-                  : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200'
-              }`}
+        <div className="flex items-center gap-2">
+          <span className="text-xs text-gray-400 dark:text-gray-500 hidden sm:inline">
+            Ctrl + scroll to zoom
+          </span>
+          <div className="flex items-center bg-gray-100 dark:bg-gray-700 rounded-lg p-1 gap-1">
+            <button
+              onClick={() => zoom(0.8)}
+              className="p-1.5 rounded-md text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 hover:bg-white dark:hover:bg-gray-600 transition-all"
+              title="Zoom out"
             >
-              {s === 'day' ? 'Days' : s === 'week' ? 'Weeks' : 'Months'}
+              <ZoomOut size={15} />
             </button>
-          ))}
+            <span className="text-xs font-medium text-gray-600 dark:text-gray-300 w-12 text-center select-none">
+              {scaleLabel}
+            </span>
+            <button
+              onClick={() => zoom(1.25)}
+              className="p-1.5 rounded-md text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 hover:bg-white dark:hover:bg-gray-600 transition-all"
+              title="Zoom in"
+            >
+              <ZoomIn size={15} />
+            </button>
+          </div>
         </div>
       </div>
 
@@ -331,8 +364,8 @@ export default function GanttPage({ onNavigate }: GanttPageProps) {
             <p className="text-sm mt-1">Add dates to your tasks to see them here.</p>
           </div>
         ) : (
-          <div className="overflow-x-auto">
-            <div style={{ minWidth: `${Math.max(800, periods.length * 80)}px` }}>
+          <div className="overflow-x-auto" onWheel={handleWheel}>
+            <div style={{ minWidth: `${Math.max(600, SIDEBAR_WIDTH + periods.length * colWidth)}px` }}>
               {/* Timeline header */}
               <div className="flex border-b border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/50 sticky top-0 z-20 h-[33px]">
                 <div className="w-52 shrink-0 border-r border-gray-200 dark:border-gray-700 px-4 py-2 text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider flex items-center">

@@ -10,7 +10,7 @@ import MemoEditPage from './pages/MemoEdit'
 import AiChatWidget from './components/AiChatWidget'
 import { storage } from './storage/local'
 import { MemoType } from './types/memo'
-import { LayoutList, Kanban, GanttChartSquare, FileText, Settings, Tag, X, Menu } from 'lucide-react'
+import { LayoutList, Kanban, GanttChartSquare, FileText, CheckSquare, Settings, Tag, X, Menu } from 'lucide-react'
 
 export type PageState =
   | { type: 'list' }
@@ -22,11 +22,40 @@ export type PageState =
   | { type: 'memo' }
   | { type: 'memo-edit'; id?: string; draft?: { title: string; content: string; type: MemoType } }
 
+const TASK_VIEWS = ['list', 'board', 'gantt'] as const
+type TaskViewType = typeof TASK_VIEWS[number]
+
+const VIEW_ITEMS: { type: TaskViewType; icon: React.ElementType; label: string }[] = [
+  { type: 'list',  icon: LayoutList,       label: 'List'  },
+  { type: 'board', icon: Kanban,            label: 'Board' },
+  { type: 'gantt', icon: GanttChartSquare, label: 'Gantt' },
+]
+
+function ViewSwitcher({ page, onNavigate }: { page: PageState; onNavigate: (p: PageState) => void }) {
+  return (
+    <div className="flex bg-gray-100 dark:bg-gray-700 p-1 rounded-lg gap-0.5">
+      {VIEW_ITEMS.map(({ type, icon: Icon, label }) => (
+        <button
+          key={type}
+          onClick={() => onNavigate({ type })}
+          title={label}
+          className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-md text-sm font-medium transition-all ${
+            page.type === type
+              ? 'bg-white dark:bg-gray-600 text-gray-900 dark:text-white shadow-sm'
+              : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200'
+          }`}
+        >
+          <Icon size={15} />
+          <span className="hidden sm:inline">{label}</span>
+        </button>
+      ))}
+    </div>
+  )
+}
+
 const NAV_ITEMS = [
-  { type: 'list' as const,  icon: LayoutList,       desktopLabel: 'List View' },
-  { type: 'board' as const, icon: Kanban,            desktopLabel: 'Board View' },
-  { type: 'gantt' as const, icon: GanttChartSquare, desktopLabel: 'Gantt View' },
-  { type: 'memo' as const,  icon: FileText,          desktopLabel: 'Memo' },
+  { type: 'list' as const, icon: CheckSquare, desktopLabel: 'Tasks' },
+  { type: 'memo' as const, icon: FileText,    desktopLabel: 'Memo'  },
 ]
 
 interface SidebarContentProps {
@@ -47,7 +76,11 @@ function SidebarContent({ page, allTags, selectedTag, onNavigate, onTagSelect }:
             key={type}
             onClick={() => onNavigate({ type })}
             className={`flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-medium transition-all ${
-              (page.type === type || (type === 'memo' && page.type === 'memo-edit')) && selectedTag === null
+              (
+                (type === 'list' && (TASK_VIEWS as readonly string[]).includes(page.type) && selectedTag === null) ||
+                (type === 'memo' && (page.type === 'memo' || page.type === 'memo-edit')) ||
+                (type !== 'list' && type !== 'memo' && page.type === type && selectedTag === null)
+              )
                 ? 'bg-blue-50 text-blue-700 dark:bg-blue-900/50 dark:text-blue-200'
                 : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900 dark:text-gray-300 dark:hover:bg-gray-700 dark:hover:text-white'
             }`}
@@ -192,29 +225,37 @@ function App() {
       {/* Content area */}
       <div className="flex-1 flex flex-col overflow-hidden min-h-0">
         {/* Mobile header */}
-        <header className="sm:hidden flex items-center gap-3 h-14 px-4 bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 shrink-0">
+        <header className="sm:hidden flex items-center gap-2 h-14 px-4 bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 shrink-0">
           <button
             onClick={() => setMobileNavOpen(true)}
-            className="text-gray-600 dark:text-gray-300 p-1"
+            className="text-gray-600 dark:text-gray-300 p-1 shrink-0"
           >
             <Menu size={24} />
           </button>
           <h1
-            className="text-lg font-bold bg-clip-text text-transparent bg-gradient-to-r from-blue-600 to-indigo-600 flex-1 cursor-pointer"
+            className="text-lg font-bold bg-clip-text text-transparent bg-gradient-to-r from-blue-600 to-indigo-600 flex-1 cursor-pointer min-w-0 truncate"
             onClick={() => navigateTo({ type: 'list' })}
           >
             ToDo List
           </h1>
-          {selectedTag && (
-            <span className="flex items-center gap-1 bg-indigo-100 text-indigo-700 dark:bg-indigo-900/40 dark:text-indigo-300 text-xs font-medium px-2.5 py-1 rounded-full">
+          {(TASK_VIEWS as readonly string[]).includes(page.type) && (
+            <ViewSwitcher page={page} onNavigate={navigateTo} />
+          )}
+          {!(TASK_VIEWS as readonly string[]).includes(page.type) && selectedTag && (
+            <span className="flex items-center gap-1 bg-indigo-100 text-indigo-700 dark:bg-indigo-900/40 dark:text-indigo-300 text-xs font-medium px-2.5 py-1 rounded-full shrink-0">
               <Tag size={11} />
-              <span className="max-w-[100px] truncate">{selectedTag}</span>
-              <button onClick={() => setSelectedTag(null)} className="ml-0.5">
-                <X size={11} />
-              </button>
+              <span className="max-w-[80px] truncate">{selectedTag}</span>
+              <button onClick={() => setSelectedTag(null)} className="ml-0.5"><X size={11} /></button>
             </span>
           )}
         </header>
+
+        {/* View switcher bar – only on task pages, desktop */}
+        {(TASK_VIEWS as readonly string[]).includes(page.type) && (
+          <div className="hidden sm:flex justify-end px-8 pt-5 pb-0 shrink-0">
+            <ViewSwitcher page={page} onNavigate={navigateTo} />
+          </div>
+        )}
 
         <main className="flex-1 overflow-y-auto overflow-x-hidden p-4 sm:p-8 transition-all duration-300">
           <div className="mx-auto w-full min-w-0">
