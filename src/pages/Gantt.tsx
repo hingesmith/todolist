@@ -3,7 +3,7 @@ import { PageState } from '../App'
 import { Badge } from '../components/ui/Badge'
 import { storage } from '../storage/local'
 import { Todo, TodoStatus } from '../types/todo'
-import { Clock, CalendarDays, X } from 'lucide-react'
+import { Clock, CalendarDays, X, Tag } from 'lucide-react'
 
 interface GanttPageProps {
   onNavigate: (page: PageState) => void
@@ -180,6 +180,12 @@ export default function GanttPage({ onNavigate, selectedTags, onTagSelect, onTag
   }, [])
 
   React.useEffect(() => { setTodos(storage.getTodos()) }, [])
+
+  const allTags = React.useMemo(() => {
+    const set = new Set<string>()
+    todos.forEach(t => t.tags?.forEach(tag => set.add(tag)))
+    return Array.from(set).sort()
+  }, [todos])
 
   // Display source: live during drag, stored otherwise
   const tagFilter = React.useCallback((t: Todo) =>
@@ -364,17 +370,38 @@ export default function GanttPage({ onNavigate, selectedTags, onTagSelect, onTag
     <div className="space-y-6 min-w-0">
       {/* Header */}
       <div className="flex items-center justify-between gap-4">
-        <div className="flex items-center gap-3 flex-wrap">
-          <h2 className="text-3xl font-bold tracking-tight text-gray-900 dark:text-gray-100">Gantt</h2>
-          {selectedTags.map(tag => (
-            <span key={tag} className="flex items-center gap-1 bg-indigo-100 text-indigo-700 dark:bg-indigo-900/40 dark:text-indigo-300 text-sm font-medium px-2.5 py-0.5 rounded-full">
-              {tag}
-              <button onClick={onTagClear} className="ml-0.5 hover:text-indigo-900 dark:hover:text-indigo-100"><X size={13} /></button>
-            </span>
-          ))}
-        </div>
+        <h2 className="text-3xl font-bold tracking-tight text-gray-900 dark:text-gray-100">Gantt</h2>
         <span className="text-sm text-gray-500 dark:text-gray-400 select-none">{scaleLabel}</span>
       </div>
+
+      {/* Filter strip */}
+      {allTags.length > 0 && (
+        <div className="flex items-center gap-2 overflow-x-auto pb-1 -mx-1 px-1 sm:flex-wrap sm:overflow-visible">
+          <span className="text-xs text-gray-500 dark:text-gray-400 font-medium shrink-0 flex items-center gap-1"><Tag size={11} />Tag:</span>
+          {allTags.map(tag => {
+            const active = selectedTags.includes(tag)
+            return (
+              <button
+                key={tag}
+                onClick={() => onTagSelect(tag)}
+                className={`flex items-center gap-1 text-xs px-2.5 py-1 rounded-full border font-medium transition-all shrink-0 ${
+                  active
+                    ? 'bg-indigo-600 text-white border-indigo-600'
+                    : 'bg-white dark:bg-gray-800 text-gray-600 dark:text-gray-300 border-gray-300 dark:border-gray-600 hover:border-indigo-400 hover:text-indigo-600 dark:hover:text-indigo-400'
+                }`}
+              >
+                #{tag}
+                {active && <X size={10} />}
+              </button>
+            )
+          })}
+          {selectedTags.length > 0 && (
+            <button onClick={onTagClear} className="text-xs text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 underline shrink-0">
+              Clear
+            </button>
+          )}
+        </div>
+      )}
 
       {/* Chart */}
       <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 shadow-sm overflow-hidden">
