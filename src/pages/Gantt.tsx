@@ -3,10 +3,13 @@ import { PageState } from '../App'
 import { Badge } from '../components/ui/Badge'
 import { storage } from '../storage/local'
 import { Todo, TodoStatus } from '../types/todo'
-import { Clock, CalendarDays } from 'lucide-react'
+import { Clock, CalendarDays, X } from 'lucide-react'
 
 interface GanttPageProps {
   onNavigate: (page: PageState) => void
+  selectedTags: string[]
+  onTagSelect: (tag: string) => void
+  onTagClear: () => void
 }
 
 const ROW_HEIGHT = 64
@@ -139,7 +142,7 @@ function scaleFromColWidth(w: number): Scale {
 
 const DEFAULT_COL_WIDTH = 60  // → week scale
 
-export default function GanttPage({ onNavigate }: GanttPageProps) {
+export default function GanttPage({ onNavigate, selectedTags, onTagSelect, onTagClear }: GanttPageProps) {
   const [todos, setTodos]       = React.useState<Todo[]>([])
   const [colWidth, setColWidth] = React.useState(DEFAULT_COL_WIDTH)
   const [tooltip, setTooltip]   = React.useState<{ todo: Todo; x: number; y: number } | null>(null)
@@ -179,12 +182,15 @@ export default function GanttPage({ onNavigate }: GanttPageProps) {
   React.useEffect(() => { setTodos(storage.getTodos()) }, [])
 
   // Display source: live during drag, stored otherwise
+  const tagFilter = React.useCallback((t: Todo) =>
+    selectedTags.length === 0 || selectedTags.some(tag => t.tags?.includes(tag)), [selectedTags])
+
   const displayTodos = React.useMemo(
-    () => (liveTodos ?? todos).filter(t => t.start_date && t.end_date),
-    [liveTodos, todos]
+    () => (liveTodos ?? todos).filter(t => t.start_date && t.end_date && tagFilter(t)),
+    [liveTodos, todos, tagFilter]
   )
-  const scheduledTodos  = React.useMemo(() => todos.filter(t => t.start_date && t.end_date), [todos])
-  const unscheduledTodos = React.useMemo(() => todos.filter(t => !t.start_date || !t.end_date), [todos])
+  const scheduledTodos  = React.useMemo(() => todos.filter(t => t.start_date && t.end_date && tagFilter(t)), [todos, tagFilter])
+  const unscheduledTodos = React.useMemo(() => todos.filter(t => (!t.start_date || !t.end_date) && tagFilter(t)), [todos, tagFilter])
 
   // Range: derived from stored todos (stays fixed during drag)
   const { rangeStart, rangeEnd, periods } = React.useMemo(() => {
@@ -358,7 +364,15 @@ export default function GanttPage({ onNavigate }: GanttPageProps) {
     <div className="space-y-6 min-w-0">
       {/* Header */}
       <div className="flex items-center justify-between gap-4">
-        <h2 className="text-3xl font-bold tracking-tight text-gray-900 dark:text-gray-100">Gantt</h2>
+        <div className="flex items-center gap-3 flex-wrap">
+          <h2 className="text-3xl font-bold tracking-tight text-gray-900 dark:text-gray-100">Gantt</h2>
+          {selectedTags.map(tag => (
+            <span key={tag} className="flex items-center gap-1 bg-indigo-100 text-indigo-700 dark:bg-indigo-900/40 dark:text-indigo-300 text-sm font-medium px-2.5 py-0.5 rounded-full">
+              {tag}
+              <button onClick={onTagClear} className="ml-0.5 hover:text-indigo-900 dark:hover:text-indigo-100"><X size={13} /></button>
+            </span>
+          ))}
+        </div>
         <span className="text-sm text-gray-500 dark:text-gray-400 select-none">{scaleLabel}</span>
       </div>
 
@@ -437,10 +451,19 @@ export default function GanttPage({ onNavigate }: GanttPageProps) {
                         <p className={`text-sm font-medium truncate ${todo.status === 'done' ? 'line-through text-gray-400' : 'text-gray-800 dark:text-gray-100'}`}>
                           {todo.title}
                         </p>
-                        <div>
-                          <Badge priority={todo.priority} className="mt-1 text-[10px]">
+                        <div className="flex flex-wrap gap-1 mt-1">
+                          <Badge priority={todo.priority} className="text-[10px]">
                             {prioritizeText[todo.priority || 'medium']}
                           </Badge>
+                          {todo.tags?.map(tag => (
+                            <span
+                              key={tag}
+                              className={`text-[10px] px-1.5 py-0.5 rounded cursor-pointer transition-colors ${selectedTags.includes(tag) ? 'bg-indigo-600 text-white' : 'bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 hover:bg-indigo-100 dark:hover:bg-indigo-900/40'}`}
+                              onClick={e => { e.stopPropagation(); onTagSelect(tag) }}
+                            >
+                              {tag}
+                            </span>
+                          ))}
                         </div>
                       </div>
 

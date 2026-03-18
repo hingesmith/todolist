@@ -357,7 +357,7 @@ function App() {
           <div className="mx-auto w-full min-w-0">
             {page.type === 'list'      && <ListPage onNavigate={navigateTo} selectedTags={selectedTags} onTagSelect={handleTagSelect} onTagClear={handleTagClear} selectedAssignees={selectedAssignees} onAssigneeSelect={handleAssigneeSelect} onAssigneeClear={handleAssigneeClear} />}
             {page.type === 'board'     && <BoardPage onNavigate={navigateTo} selectedTags={selectedTags} onTagSelect={handleTagSelect} onTagClear={handleTagClear} selectedAssignees={selectedAssignees} onAssigneeSelect={handleAssigneeSelect} onAssigneeClear={handleAssigneeClear} />}
-            {page.type === 'gantt'     && <GanttPage onNavigate={navigateTo} />}
+            {page.type === 'gantt'     && <GanttPage onNavigate={navigateTo} selectedTags={selectedTags} onTagSelect={handleTagSelect} onTagClear={handleTagClear} />}
             {page.type === 'settings'  && <SettingsPage />}
             {page.type === 'create'    && <CreatePage onNavigate={navigateTo} onBack={() => navigateTo(prevPage)} />}
             {page.type === 'edit'      && <EditPage id={page.id} onNavigate={navigateTo} onBack={() => navigateTo(prevPage)} />}
