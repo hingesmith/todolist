@@ -11,13 +11,15 @@ export interface AiSettings {
   geminiModel: string
   localEndpoint: string
   localModel: string
+  localApiKey: string
 }
 
 export const defaultAiSettings: AiSettings = {
   provider: 'gemini',
   geminiModel: 'gemini-2.5-flash',
   localEndpoint: 'http://localhost:11434/api/chat',
-  localModel: 'llama3'
+  localModel: 'llama3',
+  localApiKey: ''
 }
 
 export const storage = {

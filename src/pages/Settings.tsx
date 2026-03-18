@@ -311,6 +311,20 @@ export default function SettingsPage() {
                     onChange={e => setAiSettings({ ...aiSettings, localModel: e.target.value })}
                   />
                 </div>
+                <div className="space-y-2">
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                    API Key <span className="text-gray-400 font-normal">(optional)</span>
+                  </label>
+                  <Input
+                    type="password"
+                    placeholder="sk-... (不要な場合は空欄)"
+                    value={aiSettings.localApiKey ?? ''}
+                    onChange={e => setAiSettings({ ...aiSettings, localApiKey: e.target.value })}
+                  />
+                  <p className="text-xs text-gray-500 dark:text-gray-400">
+                    認証が必要なエンドポイント（OpenAI API, Azure OpenAI 等）の場合に入力してください。
+                  </p>
+                </div>
               </div>
             )}
 

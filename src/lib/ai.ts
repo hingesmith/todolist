@@ -127,11 +127,16 @@ export async function generateOperationsFromChat(
 
       const sanitizedEndpoint = encodeURI(settings.localEndpoint.trim())
 
+      const headers: Record<string, string> = {
+        'Content-Type': 'application/json'
+      }
+      if (settings.localApiKey?.trim()) {
+        headers['Authorization'] = `Bearer ${settings.localApiKey.trim()}`
+      }
+
       const response = await fetch(sanitizedEndpoint, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
+        headers,
         body: JSON.stringify({
           model: settings.localModel.trim(),
           messages: payloadMessages,
