@@ -219,7 +219,7 @@ function App() {
   }, [page])
 
   const navigateTo = (newPage: PageState) => {
-    if (newPage.type === 'edit') setPrevPage(page)
+    if (newPage.type === 'edit' || newPage.type === 'create') setPrevPage(page)
     setPage(newPage)
     setMobileNavOpen(false)
   }
@@ -359,7 +359,7 @@ function App() {
             {page.type === 'board'     && <BoardPage onNavigate={navigateTo} selectedTags={selectedTags} onTagSelect={handleTagSelect} onTagClear={handleTagClear} selectedAssignees={selectedAssignees} onAssigneeSelect={handleAssigneeSelect} onAssigneeClear={handleAssigneeClear} />}
             {page.type === 'gantt'     && <GanttPage onNavigate={navigateTo} />}
             {page.type === 'settings'  && <SettingsPage />}
-            {page.type === 'create'    && <CreatePage onNavigate={navigateTo} />}
+            {page.type === 'create'    && <CreatePage onNavigate={navigateTo} onBack={() => navigateTo(prevPage)} />}
             {page.type === 'edit'      && <EditPage id={page.id} onNavigate={navigateTo} onBack={() => navigateTo(prevPage)} />}
             {page.type === 'memo'      && <MemoListPage onNavigate={navigateTo} />}
             {page.type === 'memo-edit' && <MemoEditPage id={page.id} draft={page.draft} onNavigate={navigateTo} />}

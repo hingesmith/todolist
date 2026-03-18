@@ -11,9 +11,10 @@ import { validateTodo, getValidationErrors } from '../validation/schema'
 
 interface CreatePageProps {
   onNavigate: (page: PageState) => void
+  onBack: () => void
 }
 
-export default function CreatePage({ onNavigate }: CreatePageProps) {
+export default function CreatePage({ onNavigate, onBack }: CreatePageProps) {
   const [formData, setFormData] = useState<Partial<Todo>>({
     status: 'todo',
     priority: 'medium',
@@ -346,7 +347,7 @@ export default function CreatePage({ onNavigate }: CreatePageProps) {
         </div>
 
         <div className="pt-6 flex justify-end gap-3 border-t border-gray-200 dark:border-gray-700">
-          <Button type="button" variant="ghost" onClick={() => onNavigate({ type: 'list' })}>
+          <Button type="button" variant="ghost" onClick={onBack}>
             Cancel
           </Button>
           <Button type="submit">
