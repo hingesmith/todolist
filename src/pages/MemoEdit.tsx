@@ -11,19 +11,21 @@ import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import {
   Save, Trash2, Eye, Edit2, Sparkles, Loader2,
-  Check, Plus, Edit3, AlertCircle, ArrowLeft, ChevronDown
+  Check, Plus, Edit3, AlertCircle, ArrowLeft, ChevronDown, Folder
 } from 'lucide-react'
 
 interface MemoEditPageProps {
   id?: string
+  folder?: string
   draft?: { title: string; content: string; type: MemoType }
   onNavigate: (page: PageState) => void
 }
 
-export default function MemoEditPage({ id, draft, onNavigate }: MemoEditPageProps) {
+export default function MemoEditPage({ id, folder, draft, onNavigate }: MemoEditPageProps) {
   const [title,   setTitle]   = useState('')
   const [content, setContent] = useState('')
   const [type,    setType]    = useState<MemoType>('note')
+  const [memoFolder, setMemoFolder] = useState(folder ?? '')
   const [mobileTab, setMobileTab] = useState<'edit' | 'preview'>('edit')
 
   const [isSaving,   setIsSaving]   = useState(false)
@@ -53,6 +55,7 @@ export default function MemoEditPage({ id, draft, onNavigate }: MemoEditPageProp
         setTitle(memo.title)
         setContent(memo.content)
         setType(memo.type)
+        setMemoFolder(memo.folder ?? '')
       }
     } else if (draft) {
       setTitle(draft.title)
@@ -70,6 +73,7 @@ export default function MemoEditPage({ id, draft, onNavigate }: MemoEditPageProp
         title: title || '無題',
         content,
         type,
+        folder: memoFolder || undefined,
         updated_at: now,
       }
       storage.updateMemo(updated)
@@ -82,6 +86,7 @@ export default function MemoEditPage({ id, draft, onNavigate }: MemoEditPageProp
         title: title || '無題',
         content,
         type,
+        folder: memoFolder || undefined,
         created_at: now,
         updated_at: now,
       }
@@ -104,11 +109,13 @@ export default function MemoEditPage({ id, draft, onNavigate }: MemoEditPageProp
     }
   }
 
+  const backToList = () => onNavigate({ type: 'memo', folder: memoFolder || undefined })
+
   const handleDelete = () => {
-    if (!savedMemoId.current) { onNavigate({ type: 'memo' }); return }
+    if (!savedMemoId.current) { backToList(); return }
     if (!confirm('このメモを削除しますか？')) return
     storage.deleteMemo(savedMemoId.current)
-    onNavigate({ type: 'memo' })
+    backToList()
   }
 
   const handleExtractTasks = async () => {
@@ -187,10 +194,10 @@ export default function MemoEditPage({ id, draft, onNavigate }: MemoEditPageProp
       {/* Top bar */}
       <div className="flex items-center justify-between gap-3">
         <button
-          onClick={() => onNavigate({ type: 'memo' })}
+          onClick={backToList}
           className="flex items-center gap-1.5 text-sm text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100 transition-colors"
         >
-          <ArrowLeft size={16} /> Memo
+          <ArrowLeft size={16} /> {memoFolder ? memoFolder.split('/').pop() : 'Memo'}
         </button>
 
         <div className="flex items-center gap-2">
@@ -246,6 +253,17 @@ export default function MemoEditPage({ id, draft, onNavigate }: MemoEditPageProp
         placeholder="タイトル"
         className="text-lg font-semibold"
       />
+
+      {/* Folder path */}
+      <div className="flex items-center gap-2 text-sm text-gray-500 dark:text-gray-400">
+        <Folder size={14} className="text-amber-500 shrink-0" />
+        <input
+          value={memoFolder}
+          onChange={e => setMemoFolder(e.target.value)}
+          placeholder="フォルダパス（例: work/projects）"
+          className="flex-1 bg-transparent text-sm text-gray-600 dark:text-gray-400 outline-none placeholder:text-gray-300 dark:placeholder:text-gray-600 border-b border-transparent focus:border-gray-300 dark:focus:border-gray-600 transition-colors"
+        />
+      </div>
 
       {/* Editor area */}
       <div className="flex gap-4" style={{ minHeight: '400px' }}>
