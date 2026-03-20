@@ -98,6 +98,47 @@ function cascadeConstraint(todos: Todo[], rootId: string): Todo[] {
   return result
 }
 
+/**
+ * BFS (backward): for each direct predecessor of the processed task, if the
+ * predecessor's end_date >= successor's start_date (constraint violated), shift
+ * the predecessor earlier so it ends the day before the successor starts.
+ * Duration of the predecessor is preserved.
+ */
+function cascadeConstraintBackward(todos: Todo[], rootId: string): Todo[] {
+  let result = todos
+  const queue = [rootId]
+  const visited = new Set<string>()
+
+  while (queue.length) {
+    const succId = queue.shift()!
+    const succ = result.find(t => t.id === succId)
+    if (!succ?.start_date) continue
+
+    for (const predId of (succ.dependencies ?? [])) {
+      if (visited.has(predId)) continue
+      const pred = result.find(t => t.id === predId)
+      if (!pred?.start_date || !pred.end_date) continue
+
+      // Only cascade when predecessor end date is on or after successor start date
+      if (pred.end_date >= succ.start_date) {
+        const succStartMs = new Date(succ.start_date).getTime()
+        const duration    = new Date(pred.end_date).getTime() - new Date(pred.start_date).getTime()
+        const newEndMs    = succStartMs - MS_PER_DAY
+        const newStartMs  = newEndMs - duration
+        result = result.map(t => t.id !== predId ? t : {
+          ...t,
+          start_date: toISODate(newStartMs),
+          end_date:   toISODate(newEndMs),
+        })
+        visited.add(predId)
+        queue.push(predId)
+      }
+    }
+  }
+
+  return result
+}
+
 /** Compute the new todo array for a given drag clientX */
 function computeDragResult(
   todos: Todo[],
@@ -133,8 +174,10 @@ function computeDragResult(
     }
   )
 
-  // Cascade: only shift successors when constraint is violated
-  return cascadeConstraint(updated, drag.todoId)
+  // Forward cascade: shift successors if they'd overlap
+  const afterForward = cascadeConstraint(updated, drag.todoId)
+  // Backward cascade: shift predecessors if they'd overlap
+  return cascadeConstraintBackward(afterForward, drag.todoId)
 }
 
 // ─── colors ──────────────────────────────────────────────────────────────────
