@@ -24,9 +24,7 @@ interface DragState {
   todoId: string
   mode: DragMode
   startX: number
-  barAreaWidth: number
-  origRangeStart: Date
-  origTotalMs: number
+  dragPixelsPerDay: number
   origStart: Date
   origEnd: Date
   hasMoved: boolean
@@ -90,8 +88,8 @@ function computeDragResult(
   clientX: number,
 ): Todo[] {
   const deltaX  = clientX - drag.startX
-  const deltaMsRaw = (deltaX / drag.barAreaWidth) * drag.origTotalMs
-  const deltaDays = Math.round(deltaMsRaw / MS_PER_DAY)
+  const deltaDaysRaw = deltaX / drag.dragPixelsPerDay
+  const deltaDays = Math.round(deltaDaysRaw)
   const deltaMs   = deltaDays * MS_PER_DAY
 
   const origStartMs = drag.origStart.getTime()
@@ -133,24 +131,24 @@ const STATUS_COLORS: Record<TodoStatus, string> = {
 
 // ─── component ───────────────────────────────────────────────────────────────
 
-// colWidth (px per period column) → scale
-function scaleFromColWidth(w: number): Scale {
-  if (w < 40) return 'month'
-  if (w < 90) return 'week'
-  return 'day'
+function scaleFromPixels(pxPerDay: number): Scale {
+  if (pxPerDay >= 18) return 'day'
+  if (pxPerDay >= 2.5) return 'week'
+  return 'month'
 }
 
-const DEFAULT_COL_WIDTH = 60  // → week scale
+const DEFAULT_PIXELS_PER_DAY = 10
 
 export default function GanttPage({ onNavigate, selectedTags, onTagSelect, onTagClear }: GanttPageProps) {
   const [todos, setTodos]       = React.useState<Todo[]>([])
-  const [colWidth, setColWidth] = React.useState(DEFAULT_COL_WIDTH)
+  const [pixelsPerDay, setPixelsPerDay] = React.useState(DEFAULT_PIXELS_PER_DAY)
   const [tooltip, setTooltip]   = React.useState<{ todo: Todo; x: number; y: number } | null>(null)
 
-  const scale = scaleFromColWidth(colWidth)
+  const scale = scaleFromPixels(pixelsPerDay)
 
-  const zoom = (factor: number) =>
-    setColWidth(prev => Math.max(20, Math.min(250, Math.round(prev * factor))))
+  const zoom = React.useCallback((factor: number) => {
+    setPixelsPerDay(prev => Math.max(0.1, Math.min(250, prev * factor)))
+  }, [])
 
   // Drag state
   const dragRef      = React.useRef<DragState | null>(null)
@@ -158,9 +156,6 @@ export default function GanttPage({ onNavigate, selectedTags, onTagSelect, onTag
   const liveTodosRef = React.useRef<Todo[]>([])
   const [liveTodos, setLiveTodosState] = React.useState<Todo[] | null>(null)
   const setLiveTodos = (t: Todo[] | null) => { liveTodosRef.current = t ?? []; setLiveTodosState(t) }
-
-  // Stale-closure-safe ref to latest derived values (updated every render)
-  const stateRef = React.useRef({ rangeStart: new Date(), totalMs: 1, barAreaWidth: 0 })
 
   // Arrow measurement
   const rowsDivRef        = React.useRef<HTMLDivElement | null>(null)
@@ -217,6 +212,8 @@ export default function GanttPage({ onNavigate, selectedTags, onTagSelect, onTag
   }, [scheduledTodos, scale])
 
   const totalMs = rangeEnd.getTime() - rangeStart.getTime()
+  const totalDays = totalMs / MS_PER_DAY
+  const chartWidth = totalDays * pixelsPerDay
 
   function toPercent(date: Date): number {
     return Math.max(0, Math.min(100, ((date.getTime() - rangeStart.getTime()) / totalMs) * 100))
@@ -225,10 +222,10 @@ export default function GanttPage({ onNavigate, selectedTags, onTagSelect, onTag
   const todayPct = toPercent(new Date())
 
   // Keep stateRef fresh
+  const stateRef = React.useRef({ rangeStart, totalDays, chartWidth })
   React.useEffect(() => {
-    const baw = (rowsDivRef.current?.getBoundingClientRect().width ?? 0) - SIDEBAR_WIDTH
-    stateRef.current = { rangeStart, totalMs, barAreaWidth: Math.max(1, baw) }
-  })
+    stateRef.current = { rangeStart, totalDays, chartWidth }
+  }, [rangeStart, totalDays, chartWidth])
 
   // ── drag handlers ─────────────────────────────────────────────────────────
 
@@ -242,13 +239,14 @@ export default function GanttPage({ onNavigate, selectedTags, onTagSelect, onTag
     const clientX = 'touches' in e ? e.touches[0].clientX : e.clientX
     const todo = (liveTodos ?? todos).find(t => t.id === todoId)
     if (!todo?.start_date || !todo.end_date) return
-    const baw = (rowsDivRef.current?.getBoundingClientRect().width ?? 0) - SIDEBAR_WIDTH
+    const containerW = rowsDivRef.current?.getBoundingClientRect().width ?? (SIDEBAR_WIDTH + chartWidth)
+    const baw = Math.max(1, containerW - SIDEBAR_WIDTH)
+    const dragPPD = baw / stateRef.current.totalDays
+
     dragRef.current = {
       todoId, mode,
       startX: clientX,
-      barAreaWidth: Math.max(1, baw),
-      origRangeStart: rangeStart,
-      origTotalMs: totalMs,
+      dragPixelsPerDay: dragPPD,
       origStart: new Date(todo.start_date),
       origEnd:   new Date(todo.end_date),
       hasMoved: false,
@@ -331,46 +329,68 @@ export default function GanttPage({ onNavigate, selectedTags, onTagSelect, onTag
   const prioritizeText: Record<string, string> = { low: 'Low', medium: 'Medium', high: 'High' }
 
   const scrollContainerRef = React.useRef<HTMLDivElement | null>(null)
+  const pinchRef = React.useRef<{ dist: number } | null>(null)
+  const isHoveredRef = React.useRef(false)
+
+  // Document-level wheel handler: intercepts browser zoom when mouse is over the chart
+  React.useEffect(() => {
+    const onDocWheel = (e: WheelEvent) => {
+      if (!isHoveredRef.current) return
+      if (e.ctrlKey || e.metaKey) {
+        e.preventDefault()
+        const factor = Math.exp(-e.deltaY * 0.005)
+        zoom(factor)
+      }
+    }
+    document.addEventListener('wheel', onDocWheel, { passive: false })
+    return () => document.removeEventListener('wheel', onDocWheel)
+  }, [zoom])
 
   React.useEffect(() => {
     const el = scrollContainerRef.current
     if (!el) return
-    const onWheel = (e: WheelEvent) => {
-      if (!e.ctrlKey && !e.metaKey) return
-      e.preventDefault()
-      zoom(e.deltaY < 0 ? 1.15 : 0.87)
+
+    const onGestureStart = (e: Event) => e.preventDefault()
+    const onGestureChange = (e: Event) => e.preventDefault()
+
+    const onTouchStart = (e: TouchEvent) => {
+      if (e.touches.length === 2) {
+        dragRef.current = null
+        pinchRef.current = {
+          dist: Math.hypot(e.touches[0].clientX - e.touches[1].clientX, e.touches[0].clientY - e.touches[1].clientY)
+        }
+      }
     }
-    el.addEventListener('wheel', onWheel, { passive: false })
-    return () => el.removeEventListener('wheel', onWheel)
-  }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Pinch-to-zoom
-  const pinchRef = React.useRef<{ dist: number } | null>(null)
-
-  const getTouchDist = (e: React.TouchEvent) => {
-    const t0 = e.touches[0], t1 = e.touches[1]
-    return Math.hypot(t0.clientX - t1.clientX, t0.clientY - t1.clientY)
-  }
-
-  const handleChartTouchStart = React.useCallback((e: React.TouchEvent) => {
-    if (e.touches.length === 2) {
-      dragRef.current = null // cancel any bar drag
-      pinchRef.current = { dist: getTouchDist(e) }
+    const onTouchMove = (e: TouchEvent) => {
+      if (e.touches.length === 2) {
+        e.preventDefault()
+        if (!pinchRef.current) return
+        const newDist = Math.hypot(e.touches[0].clientX - e.touches[1].clientX, e.touches[0].clientY - e.touches[1].clientY)
+        const factor = newDist / pinchRef.current.dist
+        pinchRef.current.dist = newDist
+        zoom(factor)
+      }
     }
-  }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
-  const handleChartTouchMove = React.useCallback((e: React.TouchEvent) => {
-    if (e.touches.length !== 2 || !pinchRef.current) return
-    e.preventDefault()
-    const newDist = getTouchDist(e)
-    const factor = newDist / pinchRef.current.dist
-    pinchRef.current.dist = newDist
-    zoom(factor)
-  }, []) // eslint-disable-line react-hooks/exhaustive-deps
+    const onTouchEnd = () => { pinchRef.current = null }
 
-  const handleChartTouchEnd = React.useCallback(() => {
-    pinchRef.current = null
-  }, [])
+    el.addEventListener('gesturestart', onGestureStart, { passive: false })
+    el.addEventListener('gesturechange', onGestureChange, { passive: false })
+    el.addEventListener('touchstart', onTouchStart, { passive: false })
+    el.addEventListener('touchmove', onTouchMove, { passive: false })
+    el.addEventListener('touchend', onTouchEnd)
+    el.addEventListener('touchcancel', onTouchEnd)
+
+    return () => {
+      el.removeEventListener('gesturestart', onGestureStart)
+      el.removeEventListener('gesturechange', onGestureChange)
+      el.removeEventListener('touchstart', onTouchStart)
+      el.removeEventListener('touchmove', onTouchMove)
+      el.removeEventListener('touchend', onTouchEnd)
+      el.removeEventListener('touchcancel', onTouchEnd)
+    }
+  }, [zoom])
 
   const scaleLabel = scale === 'day' ? 'Days' : scale === 'week' ? 'Weeks' : 'Months'
 
@@ -423,11 +443,11 @@ export default function GanttPage({ onNavigate, selectedTags, onTagSelect, onTag
           <div
             className="overflow-x-auto"
             ref={scrollContainerRef}
-            onTouchStart={handleChartTouchStart}
-            onTouchMove={handleChartTouchMove}
-            onTouchEnd={handleChartTouchEnd}
+            style={{ touchAction: 'pan-x pan-y' }}
+            onMouseEnter={() => { isHoveredRef.current = true }}
+            onMouseLeave={() => { isHoveredRef.current = false }}
           >
-            <div style={{ minWidth: `${Math.max(600, SIDEBAR_WIDTH + periods.length * colWidth)}px` }}>
+            <div style={{ minWidth: `${Math.max(600, SIDEBAR_WIDTH + chartWidth)}px` }}>
               {/* Timeline header */}
               <div className="flex border-b border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/50 sticky top-0 z-20 h-[33px]">
                 <div className="w-52 shrink-0 border-r border-gray-200 dark:border-gray-700 px-4 py-2 text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider flex items-center">
@@ -435,11 +455,16 @@ export default function GanttPage({ onNavigate, selectedTags, onTagSelect, onTag
                 </div>
                 <div className="flex-1 relative">
                   <div className="flex h-full">
-                    {periods.map((p, i) => (
-                      <div key={i} className="flex-1 px-1 py-1 flex items-center justify-center text-[10px] font-medium text-gray-500 dark:text-gray-400 border-r border-gray-100 dark:border-gray-700/50 last:border-r-0">
-                        {formatPeriodLabel(p, scale)}
-                      </div>
-                    ))}
+                    {periods.map((p, i) => {
+                      const nextP = periods[i + 1] || rangeEnd
+                      const wMs = nextP.getTime() - p.getTime()
+                      const wPx = Math.max(0, (wMs / MS_PER_DAY) * pixelsPerDay)
+                      return (
+                        <div key={i} style={{ width: wPx }} className="shrink-0 px-1 py-1 flex items-center justify-center text-[10px] font-medium text-gray-500 dark:text-gray-400 border-r border-gray-100 dark:border-gray-700/50 last:border-r-0 overflow-hidden">
+                          {formatPeriodLabel(p, scale)}
+                        </div>
+                      )
+                    })}
                   </div>
                 </div>
               </div>
@@ -506,9 +531,14 @@ export default function GanttPage({ onNavigate, selectedTags, onTagSelect, onTag
                       <div className="flex-1 relative">
                         {/* Period grid lines */}
                         <div className="absolute inset-0 flex pointer-events-none">
-                          {periods.map((_, idx) => (
-                            <div key={idx} className="flex-1 border-r border-gray-100 dark:border-gray-700/30 last:border-r-0" />
-                          ))}
+                          {periods.map((p, i) => {
+                            const nextP = periods[i + 1] || rangeEnd
+                            const wMs = nextP.getTime() - p.getTime()
+                            const wPx = Math.max(0, (wMs / MS_PER_DAY) * pixelsPerDay)
+                            return (
+                              <div key={i} style={{ width: wPx }} className="shrink-0 border-r border-gray-100 dark:border-gray-700/30 last:border-r-0" />
+                            )
+                          })}
                         </div>
 
                         {/* Today line */}
