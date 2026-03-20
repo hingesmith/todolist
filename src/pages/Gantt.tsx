@@ -57,28 +57,45 @@ function toISODate(ms: number): string {
   return new Date(ms).toISOString().slice(0, 10)
 }
 
-/** BFS: shift every transitive successor of rootId by deltaMs */
-function cascadeByDelta(todos: Todo[], rootId: string, deltaMs: number): Todo[] {
-  if (deltaMs === 0) return todos
-  const affected = new Set<string>()
+/**
+ * BFS: for each direct successor of the processed task, if the predecessor's
+ * end_date >= successor's start_date (constraint violated), shift the successor
+ * so it starts the day after the predecessor ends. Duration is preserved.
+ * Successors that are not violated are left untouched.
+ */
+function cascadeConstraint(todos: Todo[], rootId: string): Todo[] {
+  let result = todos
   const queue = [rootId]
+  const visited = new Set<string>()
+
   while (queue.length) {
-    const id = queue.shift()!
-    for (const t of todos) {
-      if (t.dependencies?.includes(id) && !affected.has(t.id)) {
-        affected.add(t.id)
-        queue.push(t.id)
+    const predId = queue.shift()!
+    const pred = result.find(t => t.id === predId)
+    if (!pred?.end_date) continue
+
+    for (const succ of result) {
+      if (!succ.dependencies?.includes(predId)) continue
+      if (visited.has(succ.id)) continue
+      if (!succ.start_date || !succ.end_date) continue
+
+      // Only cascade when predecessor end date is on or after successor start date
+      if (pred.end_date >= succ.start_date) {
+        const predEndMs  = new Date(pred.end_date).getTime()
+        const succStartMs = new Date(succ.start_date).getTime()
+        const duration   = new Date(succ.end_date).getTime() - succStartMs
+        const newStartMs = predEndMs + MS_PER_DAY
+        result = result.map(t => t.id !== succ.id ? t : {
+          ...t,
+          start_date: toISODate(newStartMs),
+          end_date:   toISODate(newStartMs + duration),
+        })
+        visited.add(succ.id)
+        queue.push(succ.id)
       }
     }
   }
-  return todos.map(t => {
-    if (!affected.has(t.id) || !t.start_date || !t.end_date) return t
-    return {
-      ...t,
-      start_date: toISODate(new Date(t.start_date).getTime() + deltaMs),
-      end_date:   toISODate(new Date(t.end_date).getTime()   + deltaMs),
-    }
-  })
+
+  return result
 }
 
 /** Compute the new todo array for a given drag clientX */
@@ -116,9 +133,8 @@ function computeDragResult(
     }
   )
 
-  // Cascade: use end-date delta for all modes (resize-left doesn't change end date → 0)
-  const endDeltaMs = newEndMs - origEndMs
-  return cascadeByDelta(updated, drag.todoId, endDeltaMs)
+  // Cascade: only shift successors when constraint is violated
+  return cascadeConstraint(updated, drag.todoId)
 }
 
 // ─── colors ──────────────────────────────────────────────────────────────────
@@ -151,9 +167,10 @@ export default function GanttPage({ onNavigate, selectedTags, onTagSelect, onTag
   }, [])
 
   // Drag state
-  const dragRef      = React.useRef<DragState | null>(null)
+  const dragRef        = React.useRef<DragState | null>(null)
   const didDragMoveRef = React.useRef(false)
-  const liveTodosRef = React.useRef<Todo[]>([])
+  const liveTodosRef   = React.useRef<Todo[]>([])
+  const origTodosRef   = React.useRef<Todo[]>([])
   const [liveTodos, setLiveTodosState] = React.useState<Todo[] | null>(null)
   const setLiveTodos = (t: Todo[] | null) => { liveTodosRef.current = t ?? []; setLiveTodosState(t) }
 
@@ -215,11 +232,11 @@ export default function GanttPage({ onNavigate, selectedTags, onTagSelect, onTag
   const totalDays = totalMs / MS_PER_DAY
   const chartWidth = totalDays * pixelsPerDay
 
-  function toPercent(date: Date): number {
-    return Math.max(0, Math.min(100, ((date.getTime() - rangeStart.getTime()) / totalMs) * 100))
+  function toPx(date: Date): number {
+    return Math.max(0, (date.getTime() - rangeStart.getTime()) / MS_PER_DAY * pixelsPerDay)
   }
 
-  const todayPct = toPercent(new Date())
+  const todayPx = toPx(new Date())
 
   // Keep stateRef fresh
   const stateRef = React.useRef({ rangeStart, totalDays, chartWidth })
@@ -243,6 +260,8 @@ export default function GanttPage({ onNavigate, selectedTags, onTagSelect, onTag
     const baw = Math.max(1, containerW - SIDEBAR_WIDTH)
     const dragPPD = baw / stateRef.current.totalDays
 
+    const baseTodos = liveTodos ?? todos
+    origTodosRef.current = baseTodos
     dragRef.current = {
       todoId, mode,
       startX: clientX,
@@ -251,7 +270,7 @@ export default function GanttPage({ onNavigate, selectedTags, onTagSelect, onTag
       origEnd:   new Date(todo.end_date),
       hasMoved: false,
     }
-    setLiveTodos(liveTodos ?? todos)
+    setLiveTodos(baseTodos)
   }
 
   // Register document-level listeners once
@@ -262,7 +281,7 @@ export default function GanttPage({ onNavigate, selectedTags, onTagSelect, onTag
       dragRef.current.hasMoved = true
       didDragMoveRef.current = true
       const clientX = 'touches' in e ? e.touches[0].clientX : e.clientX
-      const next = computeDragResult(liveTodosRef.current, dragRef.current, clientX)
+      const next = computeDragResult(origTodosRef.current, dragRef.current, clientX)
       setLiveTodos(next)
     }
 
@@ -271,7 +290,7 @@ export default function GanttPage({ onNavigate, selectedTags, onTagSelect, onTag
       const clientX = 'touches' in e
         ? (e as TouchEvent).changedTouches[0].clientX
         : (e as MouseEvent).clientX
-      const final = computeDragResult(liveTodosRef.current, dragRef.current, clientX)
+      const final = computeDragResult(origTodosRef.current, dragRef.current, clientX)
       dragRef.current = null
 
       // Persist only changed todos
@@ -494,9 +513,9 @@ export default function GanttPage({ onNavigate, selectedTags, onTagSelect, onTag
                 {displayTodos.map(todo => {
                   const startDate = new Date(todo.start_date!); startDate.setHours(0, 0, 0, 0)
                   const endDate   = new Date(todo.end_date!);   endDate.setHours(23, 59, 59, 999)
-                  const start = toPercent(startDate)
-                  const end   = toPercent(endDate)
-                  const width = Math.max(0.5, end - start)
+                  const startPx = toPx(startDate)
+                  const endPx   = toPx(endDate)
+                  const widthPx = Math.max(2, endPx - startPx)
                   const isDragging = dragRef.current?.todoId === todo.id
 
                   return (
@@ -547,15 +566,15 @@ export default function GanttPage({ onNavigate, selectedTags, onTagSelect, onTag
                         </div>
 
                         {/* Today line */}
-                        {todayPct > 0 && todayPct < 100 && (
-                          <div className="absolute top-0 bottom-0 w-px bg-red-500/50 z-10 pointer-events-none" style={{ left: `${todayPct}%` }} />
+                        {todayPx > 0 && todayPx < chartWidth && (
+                          <div className="absolute top-0 bottom-0 w-px bg-red-500/50 z-10 pointer-events-none" style={{ left: todayPx }} />
                         )}
 
                         {/* Gantt bar */}
                         <div
                           ref={el => { if (el) barRefs.current.set(todo.id, el); else barRefs.current.delete(todo.id) }}
                           className={`absolute top-1/2 -translate-y-1/2 h-7 rounded-md ${STATUS_COLORS[todo.status]} ${isDragging ? 'opacity-100 shadow-lg ring-2 ring-white/50' : 'opacity-90 hover:opacity-100'} transition-opacity shadow-sm flex items-center overflow-visible z-20`}
-                          style={{ left: `${start}%`, width: `${width}%`, cursor: dragRef.current ? 'grabbing' : 'grab' }}
+                          style={{ left: startPx, width: widthPx, cursor: dragRef.current ? 'grabbing' : 'grab' }}
                           onMouseDown={e => handleDragStart(e, todo.id, 'move')}
                           onTouchStart={e => handleDragStart(e, todo.id, 'move')}
                           onMouseEnter={e => { if (!dragRef.current) setTooltip({ todo, x: e.clientX, y: e.clientY }) }}
