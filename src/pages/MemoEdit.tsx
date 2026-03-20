@@ -7,10 +7,9 @@ import { Button } from '../components/ui/Button'
 import { Input } from '../components/ui/Input'
 import { PageState } from '../types/navigation'
 import { extractTasksFromMemo, AiOperation } from '../lib/ai'
-import ReactMarkdown from 'react-markdown'
-import remarkGfm from 'remark-gfm'
+import WysiwygEditor from '../components/WysiwygEditor'
 import {
-  Save, Trash2, Eye, Edit2, Sparkles, Loader2,
+  Save, Trash2, Sparkles, Loader2,
   Check, Plus, Edit3, AlertCircle, ArrowLeft, ChevronDown, Folder
 } from 'lucide-react'
 
@@ -26,7 +25,6 @@ export default function MemoEditPage({ id, folder, draft, onNavigate }: MemoEdit
   const [content, setContent] = useState('')
   const [type,    setType]    = useState<MemoType>('note')
   const [memoFolder, setMemoFolder] = useState(folder ?? '')
-  const [mobileTab, setMobileTab] = useState<'edit' | 'preview'>('edit')
 
   const [isSaving,   setIsSaving]   = useState(false)
   const [isAiLoading, setIsAiLoading] = useState(false)
@@ -182,13 +180,6 @@ export default function MemoEditPage({ id, folder, draft, onNavigate }: MemoEdit
     setTimeout(() => setAppliedMsg(null), 4000)
   }
 
-  const textareaClass = `
-    w-full h-full min-h-[400px] resize-none bg-transparent border border-gray-300 dark:border-gray-600
-    rounded-lg p-4 text-sm text-gray-900 dark:text-gray-100 font-mono leading-relaxed
-    focus:outline-none focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500
-    placeholder:text-gray-400 dark:placeholder:text-gray-600
-  `
-
   return (
     <div className="flex flex-col gap-4">
       {/* Top bar */}
@@ -212,22 +203,6 @@ export default function MemoEditPage({ id, folder, draft, onNavigate }: MemoEdit
               <option value="daily_report">日報</option>
             </select>
             <ChevronDown size={12} className="absolute right-2 top-1/2 -translate-y-1/2 pointer-events-none text-gray-400" />
-          </div>
-
-          {/* Mobile: Edit/Preview tab */}
-          <div className="flex sm:hidden rounded-lg border border-gray-200 dark:border-gray-700 overflow-hidden text-xs">
-            <button
-              onClick={() => setMobileTab('edit')}
-              className={`flex items-center gap-1 px-3 py-1.5 ${mobileTab === 'edit' ? 'bg-indigo-600 text-white' : 'text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700'}`}
-            >
-              <Edit2 size={12} /> 編集
-            </button>
-            <button
-              onClick={() => setMobileTab('preview')}
-              className={`flex items-center gap-1 px-3 py-1.5 ${mobileTab === 'preview' ? 'bg-indigo-600 text-white' : 'text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700'}`}
-            >
-              <Eye size={12} /> プレビュー
-            </button>
           </div>
 
           {/* Save & Delete */}
@@ -265,29 +240,12 @@ export default function MemoEditPage({ id, folder, draft, onNavigate }: MemoEdit
         />
       </div>
 
-      {/* Editor area */}
-      <div className="flex gap-4" style={{ minHeight: '400px' }}>
-        {/* Textarea — hidden on mobile when preview tab active */}
-        <div className={`flex-1 ${mobileTab === 'preview' ? 'hidden sm:flex' : 'flex'} flex-col`}>
-          <textarea
-            value={content}
-            onChange={e => setContent(e.target.value)}
-            placeholder="Markdown で記述できます..."
-            className={textareaClass}
-          />
-        </div>
-
-        {/* Preview — hidden on mobile when edit tab active */}
-        <div className={`flex-1 ${mobileTab === 'edit' ? 'hidden sm:block' : 'block'} min-h-[400px] border border-gray-200 dark:border-gray-700 rounded-lg p-4 overflow-y-auto bg-white dark:bg-gray-800`}>
-          {content.trim() ? (
-            <div className="prose prose-sm dark:prose-invert max-w-none prose-p:leading-relaxed">
-              <ReactMarkdown remarkPlugins={[remarkGfm]}>{content}</ReactMarkdown>
-            </div>
-          ) : (
-            <p className="text-sm text-gray-400 dark:text-gray-600">プレビューがここに表示されます</p>
-          )}
-        </div>
-      </div>
+      {/* WYSIWYG Editor */}
+      <WysiwygEditor
+        value={content}
+        onChange={setContent}
+        placeholder="ここに記述できます..."
+      />
 
       {/* AI: タスクを生成 */}
       <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-4 space-y-3">

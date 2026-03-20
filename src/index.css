@@ -136,6 +136,29 @@
   scrollbar-color: #374151 #111827;
 }
 
+/* TipTap WYSIWYG editor */
+.ProseMirror ul li,
+.ProseMirror ol li {
+  margin-top: 0;
+  margin-bottom: 0;
+}
+.ProseMirror ul li p,
+.ProseMirror ol li p {
+  margin-top: 0;
+  margin-bottom: 0;
+}
+
+.ProseMirror p.is-editor-empty:first-child::before {
+  content: attr(data-placeholder);
+  color: #9ca3af; /* gray-400 */
+  float: left;
+  height: 0;
+  pointer-events: none;
+}
+.dark .ProseMirror p.is-editor-empty:first-child::before {
+  color: #4b5563; /* gray-600 */
+}
+
 /* Format native date/time inputs */
 input[type="date"],
 input[type="datetime-local"] {
