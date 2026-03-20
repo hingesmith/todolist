@@ -117,7 +117,7 @@ export default function ListPage({ onNavigate, selectedTags, onTagSelect, onTagC
             {todo.title}
           </h3>
           <div className="flex items-center gap-1.5 shrink-0">
-            {!isDone && <Badge priority={todo.priority}>{prioritizeText[todo.priority || 'medium']}</Badge>}
+            {!isDone && todo.priority && <Badge priority={todo.priority}>{prioritizeText[todo.priority]}</Badge>}
             <button
               className="sm:opacity-0 sm:group-hover:opacity-100 transition-opacity text-red-400 hover:text-red-600 dark:hover:text-red-400 p-0.5"
               onClick={(e) => handleDelete(todo.id, e)}

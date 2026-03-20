@@ -579,9 +579,7 @@ export default function GanttPage({ onNavigate, selectedTags, onTagSelect, onTag
                           {todo.title}
                         </p>
                         <div className="flex flex-wrap gap-1 mt-1">
-                          <Badge priority={todo.priority} className="text-[10px]">
-                            {prioritizeText[todo.priority || 'medium']}
-                          </Badge>
+                          {todo.priority && <Badge priority={todo.priority} className="text-[10px]">{prioritizeText[todo.priority]}</Badge>}
                           {todo.tags?.map(tag => (
                             <span
                               key={tag}
@@ -679,7 +677,7 @@ export default function GanttPage({ onNavigate, selectedTags, onTagSelect, onTag
               >
                 <div className="flex items-center gap-3 min-w-0">
                   <span className={`text-sm font-medium truncate ${todo.status === 'done' ? 'line-through text-gray-400' : 'text-gray-800 dark:text-gray-100'}`}>{todo.title}</span>
-                  <Badge priority={todo.priority} className="text-[10px] shrink-0">{prioritizeText[todo.priority || 'medium']}</Badge>
+                  {todo.priority && <Badge priority={todo.priority} className="text-[10px] shrink-0">{prioritizeText[todo.priority]}</Badge>}
                 </div>
                 <span className="text-xs text-gray-400 shrink-0 ml-4 group-hover:text-indigo-500 transition-colors">
                   {!todo.start_date && !todo.end_date ? '開始日・終了日が未設定' : !todo.start_date ? '開始日が未設定' : '終了日が未設定'}

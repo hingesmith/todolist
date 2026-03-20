@@ -246,7 +246,7 @@ export default function BoardPage({ onNavigate, selectedTags, onTagSelect, onTag
                       )}
 
                       <div className="flex flex-wrap items-center justify-between gap-y-2 pt-2 mt-auto">
-                        <Badge priority={todo.priority}>{prioritizeText[todo.priority || 'medium']}</Badge>
+                        {todo.priority && <Badge priority={todo.priority}>{prioritizeText[todo.priority]}</Badge>}
                         
                         {todo.end_date && (
                           <div className="flex items-center gap-1 text-xs text-gray-500 dark:text-gray-400">

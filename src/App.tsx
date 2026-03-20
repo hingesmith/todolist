@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import ListPage from './pages/List'
 import CreatePage from './pages/Create'
 import EditPage from './pages/Edit'
@@ -7,6 +8,7 @@ import SettingsPage from './pages/Settings'
 import MemoListPage from './pages/MemoList'
 import MemoEditPage from './pages/MemoEdit'
 import AiChatWidget from './components/AiChatWidget'
+import QuickAddBar from './components/QuickAddBar'
 import { X } from 'lucide-react'
 
 import { TASK_VIEWS } from './types/navigation'
@@ -16,6 +18,7 @@ import { SidebarContent } from './components/layout/Sidebar'
 import { MobileHeader } from './components/layout/MobileHeader'
 
 function App() {
+  const [taskRefreshKey, setTaskRefreshKey] = useState(0)
   const {
     page,
     prevPage,
@@ -115,9 +118,9 @@ function App() {
 
         <main className="flex-1 overflow-y-auto overflow-x-hidden p-4 sm:p-8 transition-all duration-300">
           <div className="mx-auto w-full min-w-0">
-            {page.type === 'list'      && <ListPage onNavigate={navigateTo} selectedTags={selectedTags} onTagSelect={handleTagSelect} onTagClear={handleTagClear} selectedAssignees={selectedAssignees} onAssigneeSelect={handleAssigneeSelect} onAssigneeClear={handleAssigneeClear} />}
-            {page.type === 'board'     && <BoardPage onNavigate={navigateTo} selectedTags={selectedTags} onTagSelect={handleTagSelect} onTagClear={handleTagClear} selectedAssignees={selectedAssignees} onAssigneeSelect={handleAssigneeSelect} onAssigneeClear={handleAssigneeClear} />}
-            {page.type === 'gantt'     && <GanttPage onNavigate={navigateTo} selectedTags={selectedTags} onTagSelect={handleTagSelect} onTagClear={handleTagClear} />}
+            {page.type === 'list'      && <ListPage key={taskRefreshKey} onNavigate={navigateTo} selectedTags={selectedTags} onTagSelect={handleTagSelect} onTagClear={handleTagClear} selectedAssignees={selectedAssignees} onAssigneeSelect={handleAssigneeSelect} onAssigneeClear={handleAssigneeClear} />}
+            {page.type === 'board'     && <BoardPage key={taskRefreshKey} onNavigate={navigateTo} selectedTags={selectedTags} onTagSelect={handleTagSelect} onTagClear={handleTagClear} selectedAssignees={selectedAssignees} onAssigneeSelect={handleAssigneeSelect} onAssigneeClear={handleAssigneeClear} />}
+            {page.type === 'gantt'     && <GanttPage key={taskRefreshKey} onNavigate={navigateTo} selectedTags={selectedTags} onTagSelect={handleTagSelect} onTagClear={handleTagClear} />}
             {page.type === 'settings'  && <SettingsPage />}
             {page.type === 'create'    && <CreatePage onNavigate={navigateTo} onBack={() => navigateTo(prevPage)} />}
             {page.type === 'edit'      && <EditPage id={page.id} onNavigate={navigateTo} onBack={() => navigateTo(prevPage)} />}
@@ -126,6 +129,9 @@ function App() {
           </div>
         </main>
 
+        {page.type !== 'settings' && (
+          <QuickAddBar onTaskAdded={() => setTaskRefreshKey(k => k + 1)} selectedTags={selectedTags} allTags={allTags} />
+        )}
         {page.type !== 'settings' && (
           <AiChatWidget onNavigateToSettings={() => navigateTo({ type: 'settings' })} />
         )}
