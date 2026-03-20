@@ -523,10 +523,6 @@ export default function GanttPage({ onNavigate, selectedTags, onTagSelect, onTag
                           style={{ left: `${start}%`, width: `${width}%`, cursor: dragRef.current ? 'grabbing' : 'grab' }}
                           onMouseDown={e => handleDragStart(e, todo.id, 'move')}
                           onTouchStart={e => handleDragStart(e, todo.id, 'move')}
-                          onClick={() => {
-                            if (!didDragMoveRef.current) onNavigate({ type: 'edit', id: todo.id })
-                            didDragMoveRef.current = false
-                          }}
                           onMouseEnter={e => { if (!dragRef.current) setTooltip({ todo, x: e.clientX, y: e.clientY }) }}
                           onMouseLeave={() => setTooltip(null)}
                         >
