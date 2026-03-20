@@ -190,7 +190,7 @@ export default function MemoEditPage({ id, folder, draft, onNavigate }: MemoEdit
   `
 
   return (
-    <div className="max-w-5xl mx-auto flex flex-col gap-4">
+    <div className="flex flex-col gap-4">
       {/* Top bar */}
       <div className="flex items-center justify-between gap-3">
         <button
