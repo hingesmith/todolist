@@ -441,7 +441,7 @@ export default function GanttPage({ onNavigate, selectedTags, onTagSelect, onTag
           </div>
         ) : (
           <div
-            className="overflow-x-auto"
+            className="overflow-x-auto gantt-scroll"
             ref={scrollContainerRef}
             style={{ touchAction: 'pan-x pan-y' }}
             onMouseEnter={() => { isHoveredRef.current = true }}
@@ -449,8 +449,8 @@ export default function GanttPage({ onNavigate, selectedTags, onTagSelect, onTag
           >
             <div style={{ minWidth: `${Math.max(600, SIDEBAR_WIDTH + chartWidth)}px` }}>
               {/* Timeline header */}
-              <div className="flex border-b border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/50 sticky top-0 z-20 h-[33px]">
-                <div className="w-52 shrink-0 border-r border-gray-200 dark:border-gray-700 px-4 py-2 text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider flex items-center">
+              <div className="flex border-b border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 sticky top-0 z-20 h-[33px]">
+                <div className="w-52 shrink-0 sticky left-0 z-30 border-r border-gray-200 dark:border-gray-700 px-4 py-2 text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider flex items-center bg-gray-50 dark:bg-gray-800">
                   Task
                 </div>
                 <div className="flex-1 relative">
@@ -475,13 +475,18 @@ export default function GanttPage({ onNavigate, selectedTags, onTagSelect, onTag
                 {svgDims.w > 0 && svgDims.h > 0 && (
                   <svg style={{ position: 'absolute', top: 0, left: 0, width: svgDims.w, height: svgDims.h, pointerEvents: 'none', zIndex: 10, overflow: 'visible' }}>
                     <defs>
+                      <clipPath id="gantt-arrows-clip">
+                        <rect x={SIDEBAR_WIDTH} y={0} width={svgDims.w - SIDEBAR_WIDTH} height={svgDims.h} />
+                      </clipPath>
                       <marker id="dep-arrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
                         <path d="M 0 2 L 10 5 L 0 8 z" fill="#9ca3af" />
                       </marker>
                     </defs>
-                    {arrowData.map(({ key, d }) => (
-                      <path key={key} d={d} fill="none" stroke="#9ca3af" strokeWidth="1.5" strokeDasharray="4 2" markerEnd="url(#dep-arrow)" />
-                    ))}
+                    <g clipPath="url(#gantt-arrows-clip)">
+                      {arrowData.map(({ key, d }) => (
+                        <path key={key} d={d} fill="none" stroke="#9ca3af" strokeWidth="1.5" strokeDasharray="4 2" markerEnd="url(#dep-arrow)" />
+                      ))}
+                    </g>
                   </svg>
                 )}
 
@@ -502,7 +507,7 @@ export default function GanttPage({ onNavigate, selectedTags, onTagSelect, onTag
                     >
                       {/* Task label */}
                       <div
-                        className="w-52 shrink-0 border-r border-gray-200 dark:border-gray-700 px-4 py-2 cursor-pointer flex flex-col justify-center bg-white dark:bg-gray-800"
+                        className="w-52 shrink-0 sticky left-0 z-30 border-r border-gray-200 dark:border-gray-700 px-4 py-2 cursor-pointer flex flex-col justify-center bg-white dark:bg-gray-800"
                         onClick={() => {
                           if (!didDragMoveRef.current) onNavigate({ type: 'edit', id: todo.id })
                           didDragMoveRef.current = false
