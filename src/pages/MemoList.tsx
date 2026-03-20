@@ -3,7 +3,7 @@ import { storage } from '../storage/local'
 import { Memo } from '../types/memo'
 import { Todo } from '../types/todo'
 import { Button } from '../components/ui/Button'
-import { PageState } from '../App'
+import { PageState } from '../types/navigation'
 import {
   FilePlus, FileText, Folder, ClipboardList, Trash2, Loader2, AlertCircle,
   Home, ChevronRight, FolderPlus

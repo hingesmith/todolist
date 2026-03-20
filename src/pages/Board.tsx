@@ -1,5 +1,5 @@
 import React from 'react'
-import { PageState } from '../App'
+import { PageState } from '../types/navigation'
 import { Badge } from '../components/ui/Badge'
 import { storage } from '../storage/local'
 import { Todo, TodoStatus } from '../types/todo'

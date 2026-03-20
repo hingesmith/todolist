@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react'
-import { PageState } from '../App'
+import { PageState } from '../types/navigation'
 import { storage } from '../storage/local'
 import { Todo } from '../types/todo'
 import { Button } from '../components/ui/Button'
