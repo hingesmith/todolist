@@ -14,7 +14,7 @@ interface EditPageProps {
   onBack: () => void
 }
 
-export default function EditPage({ id, onNavigate, onBack }: EditPageProps) {
+export default function EditPage({ id, onBack }: EditPageProps) {
   const [formData, setFormData] = useState<Partial<Todo> | null>(null)
   const [tagInput, setTagInput] = useState('')
   const [depInput, setDepInput] = useState('')
@@ -164,7 +164,7 @@ export default function EditPage({ id, onNavigate, onBack }: EditPageProps) {
     }
 
     storage.updateTodo(todo)
-    onNavigate({ type: 'list' })
+    onBack()
   }
 
   return (

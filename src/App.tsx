@@ -19,8 +19,8 @@ export type PageState =
   | { type: 'settings' }
   | { type: 'create' }
   | { type: 'edit'; id: string }
-  | { type: 'memo' }
-  | { type: 'memo-edit'; id?: string; draft?: { title: string; content: string; type: MemoType } }
+  | { type: 'memo'; folder?: string }
+  | { type: 'memo-edit'; id?: string; folder?: string; draft?: { title: string; content: string; type: MemoType } }
 
 const TASK_VIEWS = ['list', 'board', 'gantt'] as const
 type TaskViewType = typeof TASK_VIEWS[number]
@@ -198,13 +198,49 @@ function SidebarContent({ page, allTags, selectedTags, allAssignees, selectedAss
 }
 
 function App() {
-  const [page, setPage] = useState<PageState>({ type: 'list' })
-  const [prevPage, setPrevPage] = useState<PageState>({ type: 'list' })
-  const [selectedTags, setSelectedTags] = useState<string[]>([])
+  const [page, setPage] = useState<PageState>(() => {
+    try {
+      const saved = localStorage.getItem('todolist_page')
+      return saved ? JSON.parse(saved) : { type: 'list' }
+    } catch { return { type: 'list' } }
+  })
+  const [prevPage, setPrevPage] = useState<PageState>(() => {
+    try {
+      const saved = localStorage.getItem('todolist_prev_page')
+      return saved ? JSON.parse(saved) : { type: 'list' }
+    } catch { return { type: 'list' } }
+  })
+  const [selectedTags, setSelectedTags] = useState<string[]>(() => {
+    try {
+      const saved = localStorage.getItem('todolist_selected_tags')
+      return saved ? JSON.parse(saved) : []
+    } catch { return [] }
+  })
   const [allTags, setAllTags] = useState<string[]>([])
-  const [selectedAssignees, setSelectedAssignees] = useState<string[]>([])
+  const [selectedAssignees, setSelectedAssignees] = useState<string[]>(() => {
+    try {
+      const saved = localStorage.getItem('todolist_selected_assignees')
+      return saved ? JSON.parse(saved) : []
+    } catch { return [] }
+  })
   const [allAssignees, setAllAssignees] = useState<string[]>([])
   const [mobileNavOpen, setMobileNavOpen] = useState(false)
+
+  useEffect(() => {
+    localStorage.setItem('todolist_page', JSON.stringify(page))
+  }, [page])
+
+  useEffect(() => {
+    localStorage.setItem('todolist_prev_page', JSON.stringify(prevPage))
+  }, [prevPage])
+
+  useEffect(() => {
+    localStorage.setItem('todolist_selected_tags', JSON.stringify(selectedTags))
+  }, [selectedTags])
+
+  useEffect(() => {
+    localStorage.setItem('todolist_selected_assignees', JSON.stringify(selectedAssignees))
+  }, [selectedAssignees])
 
   useEffect(() => {
     const todos = storage.getTodos()
@@ -361,8 +397,8 @@ function App() {
             {page.type === 'settings'  && <SettingsPage />}
             {page.type === 'create'    && <CreatePage onNavigate={navigateTo} onBack={() => navigateTo(prevPage)} />}
             {page.type === 'edit'      && <EditPage id={page.id} onNavigate={navigateTo} onBack={() => navigateTo(prevPage)} />}
-            {page.type === 'memo'      && <MemoListPage onNavigate={navigateTo} />}
-            {page.type === 'memo-edit' && <MemoEditPage id={page.id} draft={page.draft} onNavigate={navigateTo} />}
+            {page.type === 'memo'      && <MemoListPage folder={page.folder} onNavigate={navigateTo} />}
+            {page.type === 'memo-edit' && <MemoEditPage id={page.id} folder={page.folder} draft={page.draft} onNavigate={navigateTo} />}
           </div>
         </main>
 
