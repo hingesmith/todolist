@@ -11,9 +11,7 @@ import AiChatWidget from './components/AiChatWidget'
 import QuickAddBar from './components/QuickAddBar'
 import { X } from 'lucide-react'
 
-import { TASK_VIEWS } from './types/navigation'
 import { useAppState } from './hooks/useAppState'
-import { ViewSwitcher } from './components/layout/ViewSwitcher'
 import { SidebarContent } from './components/layout/Sidebar'
 import { MobileHeader } from './components/layout/MobileHeader'
 
@@ -100,7 +98,6 @@ function App() {
       <div className="flex-1 flex flex-col overflow-hidden min-h-0">
         {/* Mobile header */}
         <MobileHeader
-          page={page}
           selectedTags={selectedTags}
           selectedAssignees={selectedAssignees}
           onMenuClick={() => setMobileNavOpen(true)}
@@ -108,13 +105,6 @@ function App() {
           onTagClear={handleTagClear}
           onAssigneeClear={handleAssigneeClear}
         />
-
-        {/* View switcher bar – only on task pages, desktop */}
-        {(TASK_VIEWS as readonly string[]).includes(page.type) && (
-          <div className="hidden sm:flex justify-end px-8 pt-5 pb-0 shrink-0">
-            <ViewSwitcher page={page} onNavigate={navigateTo} />
-          </div>
-        )}
 
         <main className="flex-1 overflow-y-auto overflow-x-hidden p-4 sm:p-8 transition-all duration-300">
           <div className="mx-auto w-full min-w-0">

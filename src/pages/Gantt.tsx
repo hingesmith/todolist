@@ -1,9 +1,11 @@
 import React from 'react'
 import { PageState } from '../types/navigation'
+import { ViewSwitcher } from '../components/layout/ViewSwitcher'
+import { FilterStrip } from '../components/layout/FilterStrip'
 import { Badge } from '../components/ui/Badge'
 import { storage } from '../storage/local'
 import { Todo, TodoStatus } from '../types/todo'
-import { Clock, CalendarDays, X, Tag } from 'lucide-react'
+import { Clock, CalendarDays, X } from 'lucide-react'
 
 interface GanttPageProps {
   onNavigate: (page: PageState) => void
@@ -198,7 +200,7 @@ function scaleFromPixels(pxPerDay: number): Scale {
   return 'month'
 }
 
-const DEFAULT_PIXELS_PER_DAY = 10
+const DEFAULT_PIXELS_PER_DAY = 24
 
 export default function GanttPage({ onNavigate, selectedTags, onTagSelect, onTagClear }: GanttPageProps) {
   const [todos, setTodos]       = React.useState<Todo[]>([])
@@ -210,6 +212,13 @@ export default function GanttPage({ onNavigate, selectedTags, onTagSelect, onTag
   const zoom = React.useCallback((factor: number) => {
     setPixelsPerDay(prev => Math.max(0.1, Math.min(250, prev * factor)))
   }, [])
+
+  const setScale = React.useCallback((s: Scale) => {
+    if (s === 'day')   setPixelsPerDay(24)
+    if (s === 'week')  setPixelsPerDay(6)
+    if (s === 'month') setPixelsPerDay(1.2)
+  }, [])
+
 
   // Drag state
   const dragRef        = React.useRef<DragState | null>(null)
@@ -630,44 +639,44 @@ export default function GanttPage({ onNavigate, selectedTags, onTagSelect, onTag
     }
   }, [zoom])
 
-  const scaleLabel = scale === 'day' ? 'Days' : scale === 'week' ? 'Weeks' : 'Months'
-
   return (
     <div className="space-y-6 min-w-0">
       {/* Header */}
-      <div className="flex items-center justify-between gap-4">
+      <div className="flex items-center justify-between gap-3">
         <h2 className="text-3xl font-bold tracking-tight text-gray-900 dark:text-gray-100">Gantt</h2>
-        <span className="text-sm text-gray-500 dark:text-gray-400 select-none">{scaleLabel}</span>
+        <ViewSwitcher page={{ type: 'gantt' }} onNavigate={onNavigate} />
       </div>
 
       {/* Filter strip */}
-      {allTags.length > 0 && (
-        <div className="flex items-center gap-2 overflow-x-auto pb-1 -mx-1 px-1 sm:flex-wrap sm:overflow-visible">
-          <span className="text-xs text-gray-500 dark:text-gray-400 font-medium shrink-0 flex items-center gap-1"><Tag size={11} />Tag:</span>
-          {allTags.map(tag => {
-            const active = selectedTags.includes(tag)
+      <FilterStrip
+        allTags={allTags}
+        selectedTags={selectedTags}
+        onTagSelect={onTagSelect}
+        onTagClear={onTagClear}
+      />
+
+      {/* Scale switcher */}
+      <div className="flex justify-end">
+        <div className="flex items-center rounded-lg border border-gray-200 dark:border-gray-700 overflow-hidden text-sm font-medium">
+          {(['day', 'week', 'month'] as Scale[]).map((s) => {
+            const label = s === 'day' ? 'Daily' : s === 'week' ? 'Weekly' : 'Monthly'
+            const active = scale === s
             return (
               <button
-                key={tag}
-                onClick={() => onTagSelect(tag)}
-                className={`flex items-center gap-1 text-xs px-2.5 py-1 rounded-full border font-medium transition-all shrink-0 ${
+                key={s}
+                onClick={() => setScale(s)}
+                className={`px-3 py-1.5 transition-colors ${
                   active
-                    ? 'bg-indigo-600 text-white border-indigo-600'
-                    : 'bg-white dark:bg-gray-800 text-gray-600 dark:text-gray-300 border-gray-300 dark:border-gray-600 hover:border-indigo-400 hover:text-indigo-600 dark:hover:text-indigo-400'
+                    ? 'bg-indigo-600 text-white'
+                    : 'bg-white dark:bg-gray-800 text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700'
                 }`}
               >
-                #{tag}
-                {active && <X size={10} />}
+                {label}
               </button>
             )
           })}
-          {selectedTags.length > 0 && (
-            <button onClick={onTagClear} className="text-xs text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 underline shrink-0">
-              Clear
-            </button>
-          )}
         </div>
-      )}
+      </div>
 
       {/* Chart */}
       <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 shadow-sm overflow-hidden">

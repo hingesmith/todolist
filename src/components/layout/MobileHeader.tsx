@@ -1,9 +1,7 @@
 import { Menu, Tag, User, X } from 'lucide-react'
-import { PageState, TASK_VIEWS } from '../../types/navigation'
-import { ViewSwitcher } from './ViewSwitcher'
+import { PageState } from '../../types/navigation'
 
 interface MobileHeaderProps {
-  page: PageState
   selectedTags: string[]
   selectedAssignees: string[]
   onMenuClick: () => void
@@ -12,7 +10,7 @@ interface MobileHeaderProps {
   onAssigneeClear: () => void
 }
 
-export function MobileHeader({ page, selectedTags, selectedAssignees, onMenuClick, onNavigate, onTagClear, onAssigneeClear }: MobileHeaderProps) {
+export function MobileHeader({ selectedTags, selectedAssignees, onMenuClick, onNavigate, onTagClear, onAssigneeClear }: MobileHeaderProps) {
   return (
     <header className="sm:hidden flex items-center gap-2 h-14 px-4 bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 shrink-0">
       <button
@@ -27,10 +25,7 @@ export function MobileHeader({ page, selectedTags, selectedAssignees, onMenuClic
       >
         ToDo List
       </h1>
-      {(TASK_VIEWS as readonly string[]).includes(page.type) && (
-        <ViewSwitcher page={page} onNavigate={onNavigate} />
-      )}
-      {!(TASK_VIEWS as readonly string[]).includes(page.type) && selectedTags.length > 0 && (
+      {selectedTags.length > 0 && (
         <span className="flex items-center gap-1 bg-indigo-100 text-indigo-700 dark:bg-indigo-900/40 dark:text-indigo-300 text-xs font-medium px-2.5 py-1 rounded-full shrink-0">
           <Tag size={11} />
           <span className="max-w-[80px] truncate">
@@ -39,7 +34,7 @@ export function MobileHeader({ page, selectedTags, selectedAssignees, onMenuClic
           <button onClick={onTagClear} className="ml-0.5"><X size={11} /></button>
         </span>
       )}
-      {!(TASK_VIEWS as readonly string[]).includes(page.type) && selectedAssignees.length > 0 && (
+      {selectedAssignees.length > 0 && (
         <span className="flex items-center gap-1 bg-indigo-100 text-indigo-700 dark:bg-indigo-900/40 dark:text-indigo-300 text-xs font-medium px-2.5 py-1 rounded-full shrink-0">
           <User size={11} />
           <span className="max-w-[80px] truncate">
