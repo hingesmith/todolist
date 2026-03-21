@@ -50,10 +50,6 @@ function addPeriod(date: Date, scale: Scale, n: number): Date {
   return d
 }
 
-function formatPeriodLabel(date: Date, scale: Scale): string {
-  if (scale === 'month') return date.toLocaleDateString('ja-JP', { year: 'numeric', month: 'short' })
-  return date.toLocaleDateString('ja-JP', { month: 'short', day: 'numeric' })
-}
 
 function toISODate(ms: number): string {
   return new Date(ms).toISOString().slice(0, 10)
@@ -274,6 +270,25 @@ export default function GanttPage({ onNavigate, selectedTags, onTagSelect, onTag
     displayTodosRef.current = displayTodos
   }, [displayTodos])
 
+  // Scroll container width (for range extension to fill visible area)
+  const scrollContainerRef = React.useRef<HTMLDivElement | null>(null)
+  const scrollWidthObserverRef = React.useRef<ResizeObserver | null>(null)
+  const [scrollContainerWidth, setScrollContainerWidth] = React.useState(1200)
+
+  const scrollContainerCallbackRef = React.useCallback((el: HTMLDivElement | null) => {
+    scrollContainerRef.current = el
+    if (scrollWidthObserverRef.current) {
+      scrollWidthObserverRef.current.disconnect()
+      scrollWidthObserverRef.current = null
+    }
+    if (el) {
+      const update = () => setScrollContainerWidth(el.getBoundingClientRect().width)
+      update()
+      scrollWidthObserverRef.current = new ResizeObserver(update)
+      scrollWidthObserverRef.current.observe(el)
+    }
+  }, [])
+
   // Range: derived from stored todos (stays fixed during drag)
   const { rangeStart, rangeEnd, periods } = React.useMemo(() => {
     const today = new Date()
@@ -285,12 +300,17 @@ export default function GanttPage({ onNavigate, selectedTags, onTagSelect, onTag
       maxDate = new Date(Math.max(...ends))
     }
     const start = startOf(addPeriod(minDate, scale, -1), scale)
-    const end   = addPeriod(startOf(maxDate, scale), scale, 2)
+    let end = addPeriod(startOf(maxDate, scale), scale, 2)
+    // Ensure the chart fills the full visible scroll container width
+    const availableWidth = Math.max(0, scrollContainerWidth - SIDEBAR_WIDTH)
+    const minDays = Math.ceil(availableWidth / pixelsPerDay)
+    const minEnd = new Date(start.getTime() + minDays * MS_PER_DAY)
+    if (end < minEnd) end = minEnd
     const cols: Date[] = []
     let cur = new Date(start)
     while (cur < end) { cols.push(new Date(cur)); cur = addPeriod(cur, scale, 1) }
     return { rangeStart: start, rangeEnd: end, periods: cols }
-  }, [scheduledTodos, scale])
+  }, [scheduledTodos, scale, pixelsPerDay, scrollContainerWidth])
 
   const totalMs = rangeEnd.getTime() - rangeStart.getTime()
   const totalDays = totalMs / MS_PER_DAY
@@ -523,7 +543,30 @@ export default function GanttPage({ onNavigate, selectedTags, onTagSelect, onTag
 
   const prioritizeText: Record<string, string> = { low: 'Low', medium: 'Medium', high: 'High' }
 
-  const scrollContainerRef = React.useRef<HTMLDivElement | null>(null)
+  // ── header groups (month row above day/week row) ───────────────────────────
+  const headerGroups = React.useMemo(() => {
+    const groups: { label: string; widthPx: number }[] = []
+    let currentKey = ''
+    let currentLabel = ''
+    let currentWidth = 0
+    periods.forEach((p, i) => {
+      const nextP = periods[i + 1] || rangeEnd
+      const wPx = Math.max(0, (nextP.getTime() - p.getTime()) / MS_PER_DAY * pixelsPerDay)
+      const key   = scale === 'month' ? String(p.getFullYear()) : `${p.getFullYear()}-${p.getMonth()}`
+      const label = scale === 'month'
+        ? `${p.getFullYear()}年`
+        : p.toLocaleDateString('ja-JP', { year: 'numeric', month: 'short' })
+      if (key !== currentKey) {
+        if (currentKey) groups.push({ label: currentLabel, widthPx: currentWidth })
+        currentKey = key; currentLabel = label; currentWidth = wPx
+      } else {
+        currentWidth += wPx
+      }
+    })
+    if (currentKey) groups.push({ label: currentLabel, widthPx: currentWidth })
+    return groups
+  }, [periods, rangeEnd, scale, pixelsPerDay])
+
   const pinchRef = React.useRef<{ dist: number } | null>(null)
   const isHoveredRef = React.useRef(false)
 
@@ -637,12 +680,12 @@ export default function GanttPage({ onNavigate, selectedTags, onTagSelect, onTag
         ) : (
           <div
             className="overflow-x-auto gantt-scroll"
-            ref={scrollContainerRef}
+            ref={scrollContainerCallbackRef}
             style={{ touchAction: 'pan-x pan-y' }}
             onMouseEnter={() => { isHoveredRef.current = true }}
             onMouseLeave={() => { isHoveredRef.current = false }}
           >
-            <div style={{ minWidth: `${Math.max(600, SIDEBAR_WIDTH + chartWidth)}px` }}>
+            <div style={{ width: `${Math.max(600, SIDEBAR_WIDTH + chartWidth)}px` }}>
               {/* Selection badge */}
               {selectedIds.size > 0 && (
                 <div className="sticky left-0 z-30 flex items-center gap-2 px-4 py-1.5 bg-indigo-50 dark:bg-indigo-900/30 border-b border-indigo-200 dark:border-indigo-700 text-xs">
@@ -654,19 +697,37 @@ export default function GanttPage({ onNavigate, selectedTags, onTagSelect, onTag
               )}
 
               {/* Timeline header */}
-              <div className="flex border-b border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 sticky top-0 z-20 h-[33px]">
-                <div className="w-52 shrink-0 sticky left-0 z-30 border-r border-gray-200 dark:border-gray-700 px-4 py-2 text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider flex items-center bg-gray-50 dark:bg-gray-800">
+              <div className="flex border-b border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 sticky top-0 z-20 h-[48px]">
+                <div className="w-52 shrink-0 sticky left-0 z-30 border-r border-gray-200 dark:border-gray-700 px-4 text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider flex items-center bg-gray-50 dark:bg-gray-800">
                   Task
                 </div>
-                <div className="flex-1 relative">
-                  <div className="flex h-full">
+                <div className="flex-1 flex flex-col">
+                  {/* Row 1: Month (or year) groups */}
+                  <div className="flex border-b border-gray-100 dark:border-gray-700/50 h-[22px]">
+                    {headerGroups.map((g, i) => (
+                      <div key={i} style={{ width: g.widthPx }} className="shrink-0 px-1.5 flex items-center text-[10px] font-semibold text-gray-600 dark:text-gray-300 border-r border-gray-100 dark:border-gray-700/50 last:border-r-0 overflow-hidden whitespace-nowrap">
+                        {g.label}
+                      </div>
+                    ))}
+                  </div>
+                  {/* Row 2: Day / week-start / month number */}
+                  <div className="flex h-[26px]">
                     {periods.map((p, i) => {
                       const nextP = periods[i + 1] || rangeEnd
-                      const wMs = nextP.getTime() - p.getTime()
-                      const wPx = Math.max(0, (wMs / MS_PER_DAY) * pixelsPerDay)
+                      const wPx = Math.max(0, (nextP.getTime() - p.getTime()) / MS_PER_DAY * pixelsPerDay)
+                      let label: string
+                      let colorClass = 'text-gray-500 dark:text-gray-400'
+                      if (scale === 'month') {
+                        label = p.toLocaleDateString('ja-JP', { month: 'short' })
+                      } else {
+                        label = String(p.getDate())
+                        const dow = p.getDay()
+                        if (dow === 6) colorClass = 'text-blue-500 dark:text-blue-400'
+                        else if (dow === 0) colorClass = 'text-red-500 dark:text-red-400'
+                      }
                       return (
-                        <div key={i} style={{ width: wPx }} className="shrink-0 px-1 py-1 flex items-center justify-center text-[10px] font-medium text-gray-500 dark:text-gray-400 border-r border-gray-100 dark:border-gray-700/50 last:border-r-0 overflow-hidden">
-                          {formatPeriodLabel(p, scale)}
+                        <div key={i} style={{ width: wPx }} className={`shrink-0 flex items-center justify-center text-[10px] font-medium border-r border-gray-100 dark:border-gray-700/30 last:border-r-0 overflow-hidden ${colorClass}`}>
+                          {label}
                         </div>
                       )
                     })}
