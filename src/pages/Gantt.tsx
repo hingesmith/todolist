@@ -28,6 +28,8 @@ interface DragState {
   origStart: Date
   origEnd: Date
   hasMoved: boolean
+  multiIds: string[]
+  multiOrigPositions: Map<string, { start: Date; end: Date }>
 }
 
 // ─── pure helpers ────────────────────────────────────────────────────────────
@@ -57,12 +59,6 @@ function toISODate(ms: number): string {
   return new Date(ms).toISOString().slice(0, 10)
 }
 
-/**
- * BFS: for each direct successor of the processed task, if the predecessor's
- * end_date >= successor's start_date (constraint violated), shift the successor
- * so it starts the day after the predecessor ends. Duration is preserved.
- * Successors that are not violated are left untouched.
- */
 function cascadeConstraint(todos: Todo[], rootId: string): Todo[] {
   let result = todos
   const queue = [rootId]
@@ -78,7 +74,6 @@ function cascadeConstraint(todos: Todo[], rootId: string): Todo[] {
       if (visited.has(succ.id)) continue
       if (!succ.start_date || !succ.end_date) continue
 
-      // Only cascade when predecessor end date is on or after successor start date
       if (pred.end_date >= succ.start_date) {
         const predEndMs  = new Date(pred.end_date).getTime()
         const succStartMs = new Date(succ.start_date).getTime()
@@ -98,12 +93,6 @@ function cascadeConstraint(todos: Todo[], rootId: string): Todo[] {
   return result
 }
 
-/**
- * BFS (backward): for each direct predecessor of the processed task, if the
- * predecessor's end_date >= successor's start_date (constraint violated), shift
- * the predecessor earlier so it ends the day before the successor starts.
- * Duration of the predecessor is preserved.
- */
 function cascadeConstraintBackward(todos: Todo[], rootId: string): Todo[] {
   let result = todos
   const queue = [rootId]
@@ -119,7 +108,6 @@ function cascadeConstraintBackward(todos: Todo[], rootId: string): Todo[] {
       const pred = result.find(t => t.id === predId)
       if (!pred?.start_date || !pred.end_date) continue
 
-      // Only cascade when predecessor end date is on or after successor start date
       if (pred.end_date >= succ.start_date) {
         const succStartMs = new Date(succ.start_date).getTime()
         const duration    = new Date(pred.end_date).getTime() - new Date(pred.start_date).getTime()
@@ -150,6 +138,24 @@ function computeDragResult(
   const deltaDays = Math.round(deltaDaysRaw)
   const deltaMs   = deltaDays * MS_PER_DAY
 
+  // Multi-bar move: apply same deltaMs to all selected bars
+  if (drag.multiIds.length > 1 && drag.mode === 'move') {
+    let updated = todos
+    for (const id of drag.multiIds) {
+      const origPos = drag.multiOrigPositions.get(id)
+      if (!origPos) continue
+      const newStartMs = origPos.start.getTime() + deltaMs
+      const newEndMs   = origPos.end.getTime()   + deltaMs
+      updated = updated.map(t => t.id !== id ? t : {
+        ...t,
+        start_date: toISODate(newStartMs),
+        end_date:   toISODate(newEndMs),
+      })
+    }
+    return updated
+  }
+
+  // Single-bar logic
   const origStartMs = drag.origStart.getTime()
   const origEndMs   = drag.origEnd.getTime()
 
@@ -217,6 +223,16 @@ export default function GanttPage({ onNavigate, selectedTags, onTagSelect, onTag
   const [liveTodos, setLiveTodosState] = React.useState<Todo[] | null>(null)
   const setLiveTodos = (t: Todo[] | null) => { liveTodosRef.current = t ?? []; setLiveTodosState(t) }
 
+  // Selection state
+  const [selectedIds, setSelectedIds] = React.useState<Set<string>>(new Set())
+
+  // Marquee state
+  const marqueeRef = React.useRef<{ x1: number; y1: number; x2: number; y2: number } | null>(null)
+  const [marqueeDisplay, setMarqueeDisplay] = React.useState<{ x1: number; y1: number; x2: number; y2: number } | null>(null)
+
+  // Ref to keep displayTodos accessible inside useEffect closure
+  const displayTodosRef = React.useRef<Todo[]>([])
+
   // Arrow measurement
   const rowsDivRef        = React.useRef<HTMLDivElement | null>(null)
   const resizeObserverRef = React.useRef<ResizeObserver | null>(null)
@@ -253,6 +269,11 @@ export default function GanttPage({ onNavigate, selectedTags, onTagSelect, onTag
   const scheduledTodos  = React.useMemo(() => todos.filter(t => t.start_date && t.end_date && tagFilter(t)), [todos, tagFilter])
   const unscheduledTodos = React.useMemo(() => todos.filter(t => (!t.start_date || !t.end_date) && tagFilter(t)), [todos, tagFilter])
 
+  // Keep displayTodosRef fresh for use in event handlers
+  React.useEffect(() => {
+    displayTodosRef.current = displayTodos
+  }, [displayTodos])
+
   // Range: derived from stored todos (stays fixed during drag)
   const { rangeStart, rangeEnd, periods } = React.useMemo(() => {
     const today = new Date()
@@ -281,11 +302,11 @@ export default function GanttPage({ onNavigate, selectedTags, onTagSelect, onTag
 
   const todayPx = toPx(new Date())
 
-  // Keep stateRef fresh
-  const stateRef = React.useRef({ rangeStart, totalDays, chartWidth })
+  // Keep stateRef fresh (includes pixelsPerDay for marquee intersection calc)
+  const stateRef = React.useRef({ rangeStart, totalDays, chartWidth, pixelsPerDay })
   React.useEffect(() => {
-    stateRef.current = { rangeStart, totalDays, chartWidth }
-  }, [rangeStart, totalDays, chartWidth])
+    stateRef.current = { rangeStart, totalDays, chartWidth, pixelsPerDay }
+  }, [rangeStart, totalDays, chartWidth, pixelsPerDay])
 
   // ── drag handlers ─────────────────────────────────────────────────────────
 
@@ -296,15 +317,31 @@ export default function GanttPage({ onNavigate, selectedTags, onTagSelect, onTag
   ) {
     e.preventDefault()
     e.stopPropagation()
+    document.body.style.userSelect = 'none'
     const clientX = 'touches' in e ? e.touches[0].clientX : e.clientX
-    const todo = (liveTodos ?? todos).find(t => t.id === todoId)
+    const baseTodos = liveTodos ?? todos
+    const todo = baseTodos.find(t => t.id === todoId)
     if (!todo?.start_date || !todo.end_date) return
     const containerW = rowsDivRef.current?.getBoundingClientRect().width ?? (SIDEBAR_WIDTH + chartWidth)
     const baw = Math.max(1, containerW - SIDEBAR_WIDTH)
     const dragPPD = baw / stateRef.current.totalDays
 
-    const baseTodos = liveTodos ?? todos
     origTodosRef.current = baseTodos
+
+    // Build multi-drag info if moving a selected bar and multiple bars are selected
+    let multiIds: string[] = []
+    let multiOrigPositions: Map<string, { start: Date; end: Date }> = new Map()
+
+    if (mode === 'move' && selectedIds.has(todoId) && selectedIds.size > 1) {
+      multiIds = Array.from(selectedIds)
+      for (const id of multiIds) {
+        const t = baseTodos.find(x => x.id === id)
+        if (t?.start_date && t.end_date) {
+          multiOrigPositions.set(id, { start: new Date(t.start_date), end: new Date(t.end_date) })
+        }
+      }
+    }
+
     dragRef.current = {
       todoId, mode,
       startX: clientX,
@@ -312,6 +349,8 @@ export default function GanttPage({ onNavigate, selectedTags, onTagSelect, onTag
       origStart: new Date(todo.start_date),
       origEnd:   new Date(todo.end_date),
       hasMoved: false,
+      multiIds,
+      multiOrigPositions,
     }
     setLiveTodos(baseTodos)
   }
@@ -319,21 +358,96 @@ export default function GanttPage({ onNavigate, selectedTags, onTagSelect, onTag
   // Register document-level listeners once
   React.useEffect(() => {
     function onMove(e: MouseEvent | TouchEvent) {
+      // Handle marquee drag
+      if (marqueeRef.current) {
+        const clientX = 'touches' in e ? (e as TouchEvent).touches[0].clientX : (e as MouseEvent).clientX
+        const clientY = 'touches' in e ? (e as TouchEvent).touches[0].clientY : (e as MouseEvent).clientY
+        const container = rowsDivRef.current
+        if (container) {
+          const cr = container.getBoundingClientRect()
+          const scrollLeft = container.closest('.gantt-scroll')?.scrollLeft ?? 0
+          const x = clientX - cr.left + scrollLeft
+          const y = clientY - cr.top
+          marqueeRef.current = { ...marqueeRef.current, x2: x, y2: y }
+          setMarqueeDisplay({ ...marqueeRef.current })
+        }
+        return
+      }
+
       if (!dragRef.current) return
       e.preventDefault()
       dragRef.current.hasMoved = true
       didDragMoveRef.current = true
-      const clientX = 'touches' in e ? e.touches[0].clientX : e.clientX
+      const clientX = 'touches' in e ? (e as TouchEvent).touches[0].clientX : (e as MouseEvent).clientX
       const next = computeDragResult(origTodosRef.current, dragRef.current, clientX)
       setLiveTodos(next)
     }
 
     function onUp(e: MouseEvent | TouchEvent) {
+      // Handle marquee release
+      if (marqueeRef.current) {
+        const m = marqueeRef.current
+        marqueeRef.current = null
+        setMarqueeDisplay(null)
+        document.body.style.userSelect = ''
+
+        const dx = Math.abs(m.x2 - m.x1)
+        const dy = Math.abs(m.y2 - m.y1)
+
+        // Click (no drag) → clear selection
+        if (dx < 5 && dy < 5) {
+          setSelectedIds(new Set())
+          return
+        }
+
+        // Marquee selection: find intersecting bars
+        const selLeft   = Math.min(m.x1, m.x2)
+        const selRight  = Math.max(m.x1, m.x2)
+        const selTop    = Math.min(m.y1, m.y2)
+        const selBottom = Math.max(m.y1, m.y2)
+
+        const { rangeStart: rs, pixelsPerDay: ppd } = stateRef.current
+        const newSelected = new Set<string>()
+        displayTodosRef.current.forEach((todo, i) => {
+          if (!todo.start_date || !todo.end_date) return
+          const startDate = new Date(todo.start_date); startDate.setHours(0, 0, 0, 0)
+          const endDate   = new Date(todo.end_date);   endDate.setHours(23, 59, 59, 999)
+          const barLeft   = SIDEBAR_WIDTH + Math.max(0, (startDate.getTime() - rs.getTime()) / MS_PER_DAY * ppd)
+          const barRight  = SIDEBAR_WIDTH + Math.max(0, (endDate.getTime()   - rs.getTime()) / MS_PER_DAY * ppd)
+          const barTop    = i * ROW_HEIGHT
+          const barBottom = (i + 1) * ROW_HEIGHT
+          if (selLeft < barRight && selRight > barLeft && selTop < barBottom && selBottom > barTop) {
+            newSelected.add(todo.id)
+          }
+        })
+        setSelectedIds(newSelected)
+        return
+      }
+
       if (!dragRef.current) return
+      const drag = dragRef.current
       const clientX = 'touches' in e
         ? (e as TouchEvent).changedTouches[0].clientX
         : (e as MouseEvent).clientX
-      const final = computeDragResult(origTodosRef.current, dragRef.current, clientX)
+
+      document.body.style.userSelect = ''
+      // Bar click (no move) → toggle selection
+      if (!drag.hasMoved) {
+        dragRef.current = null
+        setSelectedIds(prev => {
+          const next = new Set(prev)
+          if (next.has(drag.todoId)) {
+            next.delete(drag.todoId)
+          } else {
+            next.add(drag.todoId)
+          }
+          return next
+        })
+        setLiveTodos(null)
+        return
+      }
+
+      const final = computeDragResult(origTodosRef.current, drag, clientX)
       dragRef.current = null
 
       // Persist only changed todos
@@ -385,6 +499,25 @@ export default function GanttPage({ onNavigate, selectedTags, onTagSelect, onTag
     })
     setArrowData(paths)
   }, [displayTodos, measureTick])
+
+  // ── rows container mousedown (marquee) ────────────────────────────────────
+
+  function handleRowsMouseDown(e: React.MouseEvent) {
+    if (dragRef.current) return
+    const target = e.target as HTMLElement
+    if (target.closest('[data-gantt-bar]') || target.closest('[data-gantt-sidebar]')) return
+
+    const container = rowsDivRef.current
+    if (!container) return
+    const cr = container.getBoundingClientRect()
+    const scrollLeft = container.closest('.gantt-scroll')?.scrollLeft ?? 0
+    const x = e.clientX - cr.left + scrollLeft
+    const y = e.clientY - cr.top
+
+    document.body.style.userSelect = 'none'
+    marqueeRef.current = { x1: x, y1: y, x2: x, y2: y }
+    setMarqueeDisplay({ x1: x, y1: y, x2: x, y2: y })
+  }
 
   // ─────────────────────────────────────────────────────────────────────────
 
@@ -510,6 +643,16 @@ export default function GanttPage({ onNavigate, selectedTags, onTagSelect, onTag
             onMouseLeave={() => { isHoveredRef.current = false }}
           >
             <div style={{ minWidth: `${Math.max(600, SIDEBAR_WIDTH + chartWidth)}px` }}>
+              {/* Selection badge */}
+              {selectedIds.size > 0 && (
+                <div className="sticky left-0 z-30 flex items-center gap-2 px-4 py-1.5 bg-indigo-50 dark:bg-indigo-900/30 border-b border-indigo-200 dark:border-indigo-700 text-xs">
+                  <span className="font-medium text-indigo-700 dark:text-indigo-300">{selectedIds.size} 件選択中</span>
+                  <button onClick={() => setSelectedIds(new Set())} className="text-indigo-400 hover:text-indigo-700 dark:hover:text-indigo-200">
+                    <X size={13} />
+                  </button>
+                </div>
+              )}
+
               {/* Timeline header */}
               <div className="flex border-b border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 sticky top-0 z-20 h-[33px]">
                 <div className="w-52 shrink-0 sticky left-0 z-30 border-r border-gray-200 dark:border-gray-700 px-4 py-2 text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider flex items-center bg-gray-50 dark:bg-gray-800">
@@ -532,7 +675,7 @@ export default function GanttPage({ onNavigate, selectedTags, onTagSelect, onTag
               </div>
 
               {/* Rows Container */}
-              <div className="relative" ref={rowsContainerRef}>
+              <div className="relative" ref={rowsContainerRef} onMouseDown={handleRowsMouseDown}>
                 {/* SVG dependency overlay */}
                 {svgDims.w > 0 && svgDims.h > 0 && (
                   <svg style={{ position: 'absolute', top: 0, left: 0, width: svgDims.w, height: svgDims.h, pointerEvents: 'none', zIndex: 10, overflow: 'visible' }}>
@@ -552,6 +695,20 @@ export default function GanttPage({ onNavigate, selectedTags, onTagSelect, onTag
                   </svg>
                 )}
 
+                {/* Marquee selection rectangle */}
+                {marqueeDisplay && (() => {
+                  const left   = Math.min(marqueeDisplay.x1, marqueeDisplay.x2)
+                  const top    = Math.min(marqueeDisplay.y1, marqueeDisplay.y2)
+                  const width  = Math.abs(marqueeDisplay.x2 - marqueeDisplay.x1)
+                  const height = Math.abs(marqueeDisplay.y2 - marqueeDisplay.y1)
+                  return (
+                    <div
+                      className="absolute pointer-events-none z-40 border-2 border-indigo-500 bg-indigo-500/10 rounded"
+                      style={{ left, top, width, height }}
+                    />
+                  )
+                })()}
+
                 {/* Task rows */}
                 {displayTodos.map(todo => {
                   const startDate = new Date(todo.start_date!); startDate.setHours(0, 0, 0, 0)
@@ -559,7 +716,8 @@ export default function GanttPage({ onNavigate, selectedTags, onTagSelect, onTag
                   const startPx = toPx(startDate)
                   const endPx   = toPx(endDate)
                   const widthPx = Math.max(2, endPx - startPx)
-                  const isDragging = dragRef.current?.todoId === todo.id
+                  const isDragging = dragRef.current?.todoId === todo.id || (dragRef.current?.multiIds.includes(todo.id) ?? false)
+                  const isSelected = selectedIds.has(todo.id)
 
                   return (
                     <div
@@ -569,6 +727,7 @@ export default function GanttPage({ onNavigate, selectedTags, onTagSelect, onTag
                     >
                       {/* Task label */}
                       <div
+                        data-gantt-sidebar={todo.id}
                         className="w-52 shrink-0 sticky left-0 z-30 border-r border-gray-200 dark:border-gray-700 px-4 py-2 cursor-pointer flex flex-col justify-center bg-white dark:bg-gray-800"
                         onClick={() => {
                           if (!didDragMoveRef.current) onNavigate({ type: 'edit', id: todo.id })
@@ -613,8 +772,9 @@ export default function GanttPage({ onNavigate, selectedTags, onTagSelect, onTag
 
                         {/* Gantt bar */}
                         <div
+                          data-gantt-bar={todo.id}
                           ref={el => { if (el) barRefs.current.set(todo.id, el); else barRefs.current.delete(todo.id) }}
-                          className={`absolute top-1/2 -translate-y-1/2 h-7 rounded-md ${STATUS_COLORS[todo.status]} ${isDragging ? 'opacity-100 shadow-lg ring-2 ring-white/50' : 'opacity-90 hover:opacity-100'} transition-opacity shadow-sm flex items-center overflow-visible z-20`}
+                          className={`absolute top-1/2 -translate-y-1/2 h-7 rounded-md ${STATUS_COLORS[todo.status]} ${isDragging ? 'opacity-100 shadow-lg ring-2 ring-white/50' : isSelected ? 'opacity-100 shadow-lg ring-2 ring-white brightness-110' : 'opacity-90 hover:opacity-100'} transition-opacity shadow-sm flex items-center overflow-visible z-20`}
                           style={{ left: startPx, width: widthPx, cursor: dragRef.current ? 'grabbing' : 'grab' }}
                           onMouseDown={e => handleDragStart(e, todo.id, 'move')}
                           onTouchStart={e => handleDragStart(e, todo.id, 'move')}
